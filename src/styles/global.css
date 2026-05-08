@@ -1,24 +1,31 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --tippani-bg: #ffffff;
-  --tippani-fg: #0f0f0f;
+  --tippani-fg: #111114;
   --tippani-muted: #6b7280;
-  --tippani-border: #e5e7eb;
-  --tippani-accent: #111827;
-  --tippani-sidebar: #fafafa;
-  color-scheme: light dark;
+  --tippani-border: #e6e6e9;
+  --tippani-accent: #111114;
+  --tippani-sidebar: #f7f7f8;
+  --tippani-tabbar: #fafafa;
+  --tippani-hover: rgba(0, 0, 0, 0.04);
+  --tippani-active: rgba(0, 0, 0, 0.08);
+  --tippani-tab-active: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --tippani-bg: #1a1a1a;
-    --tippani-fg: #e5e7eb;
-    --tippani-muted: #9ca3af;
-    --tippani-border: #2a2a2a;
-    --tippani-accent: #f3f4f6;
-    --tippani-sidebar: #141414;
-  }
+.dark {
+  --tippani-bg: #0e0e10;
+  --tippani-fg: #e7e7ea;
+  --tippani-muted: #8a8a90;
+  --tippani-border: #232326;
+  --tippani-accent: #f3f4f6;
+  --tippani-sidebar: #131316;
+  --tippani-tabbar: #161618;
+  --tippani-hover: rgba(255, 255, 255, 0.05);
+  --tippani-active: rgba(255, 255, 255, 0.1);
+  --tippani-tab-active: #1a1a1d;
 }
 
 html,
@@ -46,4 +53,26 @@ body {
 
 button {
   font-family: inherit;
+}
+
+/* Resize handle visual affordance */
+.tippani-resize-handle {
+  position: relative;
+  width: 1px;
+  background-color: var(--tippani-border);
+  transition: background-color 120ms ease;
+}
+
+.tippani-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: -3px;
+  z-index: 1;
+}
+
+.tippani-resize-handle:hover,
+.tippani-resize-handle[data-resize-handle-state="hover"],
+.tippani-resize-handle[data-resize-handle-state="drag"] {
+  background-color: var(--tippani-accent);
 }

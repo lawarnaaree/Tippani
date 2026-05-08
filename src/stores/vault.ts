@@ -7,6 +7,7 @@ import {
   pickVault,
   noteRead,
   noteWrite,
+  noteCreate,
 } from "../lib/tauri";
 
 export const SAVE_DEBOUNCE_MS = 400;
@@ -28,6 +29,8 @@ export type VaultStoreState = {
   openNote: (path: string) => Promise<void>;
   updateNoteContent: (content: string) => void;
   flushPendingSave: () => Promise<void>;
+  clearActive: () => Promise<void>;
+  createNote: (path: string) => Promise<void>;
 };
 
 export function createVaultStore() {
@@ -143,6 +146,31 @@ export function createVaultStore() {
         }
         if (pendingPath !== null && pendingContent !== null) {
           await performSave();
+        }
+      },
+
+      clearActive: async () => {
+        await get().flushPendingSave();
+        set({
+          activeNotePath: null,
+          noteContent: "",
+          saveState: "idle",
+          error: null,
+        });
+      },
+
+      createNote: async (path) => {
+        if (!path.endsWith(".md")) {
+          path = path + ".md";
+        }
+        const vaultPath = get().vaultPath;
+        if (!vaultPath) return;
+        const fullPath = vaultPath + "/" + path;
+        try {
+          await noteCreate(fullPath);
+          await get().refresh();
+        } catch (e) {
+          set({ error: String(e) });
         }
       },
     };

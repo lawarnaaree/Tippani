@@ -23,7 +23,7 @@ For the original strategy doc (motivation, library choices, architecture sketch,
 | F0    | Scaffold (Tauri + React + Vite)  | ✅     | done    | —          |
 | F0.5  | Rebrand to Tippani               | ✅     | ½ day   | F0         |
 | F1    | Vault + markdown editor          | ✅     | 3–5 d   | F0.5       |
-| F2    | Layout + Tippani aesthetic       | ⬜     | 2–3 d   | F1         |
+| F2    | Layout + Tippani aesthetic       | ✅     | 2–3 d   | F1         |
 | F3    | Command palette `⌘K`             | ⬜     | 1–2 d   | F2         |
 | F4    | Excalidraw canvas                | ⬜     | 3–5 d   | F2         |
 | F5    | Diagram-as-code (Mermaid)        | ⬜     | 3–4 d   | F1         |
@@ -76,19 +76,27 @@ For the original strategy doc (motivation, library choices, architecture sketch,
   - ✅ Round-trip: external content edits made before app launch are loaded correctly.
 - **Deferred.** Live external-edit reflection (file watcher) is F6. Multi-tab editing is F2.
 
-### F2 — Layout + Tippani aesthetic ⬜
+### F2 — Layout + Tippani aesthetic ✅
 
 - **Goal.** Make the app *feel* like Eraser — minimal, monochrome, tight spacing, multi-tab, resizable.
-- **User outcome.** Open multiple notes as tabs; resize sidebar/editor/right pane; switch dark/light theme.
-- **Key files (to create).**
-  - `src/components/Layout/AppShell.tsx` — top bar, panes, tab strip.
-  - `src/components/Layout/TabBar.tsx`.
-  - `src/stores/tabs.ts` — open tabs, active tab.
-  - `src/stores/settings.ts` — theme, font, keymap (initial scaffold).
-  - `src/styles/theme.css` — tokens for monochrome palette.
-- **Libraries.** `react-resizable-panels`, `tailwindcss` (already installed), `clsx` + `tailwind-merge` (already installed), shadcn/ui primitives (Radix-based) added on demand.
-- **Acceptance.** Tab open/close/switch works; panes resize and persist; dark/light toggle is one shortcut away; empty states + focus rings are intentional, not browser defaults.
-- **Risks.** Don't over-build a design system in F2. Ship the look, defer abstractions until F3+ actually need them.
+- **User outcome.** Open multiple notes as tabs; resize / collapse the sidebar; cycle theme system→light→dark with `Ctrl/Cmd+Shift+L`.
+- **Implementation plan.** [docs/plans/F2-layout-aesthetic.md](plans/F2-layout-aesthetic.md).
+- **Status note.** Landed 2026-05-08. 8 Rust tests + 59 Vitest tests passing. All CI gates (tsc, vitest, build, fmt, clippy, cargo test) green locally.
+- **Files shipped.**
+  - Stores: [src/stores/tabs.ts](../src/stores/tabs.ts), [src/stores/settings.ts](../src/stores/settings.ts), plus [src/stores/vault.ts](../src/stores/vault.ts) `clearActive()` action.
+  - Hooks: [src/hooks/useResolvedTheme.ts](../src/hooks/useResolvedTheme.ts).
+  - Components: [src/components/Layout/AppShell.tsx](../src/components/Layout/AppShell.tsx), [src/components/Layout/TopBar.tsx](../src/components/Layout/TopBar.tsx), [src/components/Layout/TabBar.tsx](../src/components/Layout/TabBar.tsx).
+  - Updates: [src/App.tsx](../src/App.tsx) (composes shell + bridges tabs↔vault), [src/main.tsx](../src/main.tsx) (pre-render theme bootstrap), [src/styles/global.css](../src/styles/global.css) (`@custom-variant dark` + class-based tokens), [src/components/Editor/MarkdownEditor.tsx](../src/components/Editor/MarkdownEditor.tsx) (uses `useResolvedTheme`).
+  - Tests: [tests/unit/tabs-store.test.ts](../tests/unit/tabs-store.test.ts) (14), [tests/unit/settings-store.test.ts](../tests/unit/settings-store.test.ts) (10), [tests/component/TabBar.test.tsx](../tests/component/TabBar.test.tsx) (6).
+- **Acceptance (met).**
+  - ✅ Tab open / focus-existing / close / middle-click-close / switch all work; closing active picks right neighbor.
+  - ✅ Sidebar/main divider resizes; sidebar collapsible-to-0 with snap; sizes persist via `react-resizable-panels` `useDefaultLayout` + localStorage.
+  - ✅ Theme cycle (system / light / dark) one shortcut away; persists; `system` mode live-tracks OS `prefers-color-scheme`.
+  - ✅ Empty states + focus rings are intentional (`No vault open`, `Select a note`, `Welcome to Tippani`).
+- **Notable choices.**
+  - `react-resizable-panels` v4 API (`Group` / `Separator` / `useDefaultLayout`) — different from the canonical v2.x API, adapted accordingly.
+  - localStorage polyfill in [tests/setup.ts](../tests/setup.ts) for jsdom 26 environment quirk.
+- **Deferred.** Tab drag-to-reorder; preview tabs; per-vault state file; sidebar icons rail when collapsed.
 
 ### F3 — Command palette `⌘K` ⬜
 

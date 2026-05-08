@@ -1,7 +1,8 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useResolvedTheme } from "../../hooks/useResolvedTheme";
 
 type Props = {
   value: string;
@@ -9,20 +10,8 @@ type Props = {
 };
 
 export function MarkdownEditor({ value, onChange }: Props) {
-  const [isDark, setIsDark] = useState(() =>
-    typeof window !== "undefined" &&
-    window.matchMedia &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
+  const resolved = useResolvedTheme();
+  const isDark = resolved === "dark";
   const extensions = useMemo(() => [markdown()], []);
 
   return (
