@@ -99,6 +99,21 @@ pub fn note_write(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn note_write_bytes(path: String, base64: String) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let bytes = STANDARD
+        .decode(base64.as_bytes())
+        .map_err(|e| format!("base64 decode failed: {}", e))?;
+    let p = PathBuf::from(&path);
+    if let Some(parent) = p.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {}", e))?;
+        }
+    }
+    fs::write(&p, bytes).map_err(|e| format!("write failed: {}", e))
+}
+
+#[tauri::command]
 pub fn note_create(path: String) -> Result<(), String> {
     let p = PathBuf::from(&path);
     if p.exists() {
@@ -237,6 +252,31 @@ mod tests {
         assert!(!from.exists());
         assert!(to.exists());
         assert_eq!(fs::read_to_string(&to).unwrap(), "x");
+    }
+
+    #[test]
+    fn write_bytes_decodes_base64_and_writes_binary() {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("img.png");
+        let payload: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        let b64 = STANDARD.encode(payload);
+        note_write_bytes(path.to_string_lossy().to_string(), b64).unwrap();
+        let read_back = fs::read(&path).unwrap();
+        assert_eq!(read_back, payload);
+    }
+
+    #[test]
+    fn write_bytes_errors_on_bad_base64() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("bad.bin");
+        let err = note_write_bytes(
+            path.to_string_lossy().to_string(),
+            "!!!not-base64!!!".to_string(),
+        )
+        .unwrap_err();
+        assert!(err.contains("base64 decode failed"));
+        assert!(!path.exists());
     }
 
     #[test]

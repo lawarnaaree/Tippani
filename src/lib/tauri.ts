@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 export type EntryKind = "file" | "folder";
 
@@ -26,6 +26,20 @@ export function noteRead(path: string): Promise<string> {
 
 export function noteWrite(path: string, content: string): Promise<void> {
   return invoke<void>("note_write", { path, content });
+}
+
+export function noteWriteBytes(path: string, base64: string): Promise<void> {
+  return invoke<void>("note_write_bytes", { path, base64 });
+}
+
+export type SaveDialogFilter = { name: string; extensions: string[] };
+
+export async function pickSavePath(opts: {
+  defaultPath?: string;
+  filters?: SaveDialogFilter[];
+}): Promise<string | null> {
+  const r = await save(opts);
+  return typeof r === "string" ? r : null;
 }
 
 export function noteCreate(path: string): Promise<void> {

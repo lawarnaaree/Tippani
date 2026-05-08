@@ -43,6 +43,7 @@ export function TopBar({
             <button
               type="button"
               onClick={() => onSetViewMode("document")}
+              title="Editor only"
               className={`px-3 py-1 ${activeViewMode === "document" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
             >
               Document
@@ -50,6 +51,7 @@ export function TopBar({
             <button
               type="button"
               onClick={() => onSetViewMode("both")}
+              title="Editor + live preview (Mermaid)"
               className={`px-3 py-1 border-l border-r border-[var(--tippani-border)] ${activeViewMode === "both" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
             >
               Both
@@ -57,6 +59,7 @@ export function TopBar({
             <button
               type="button"
               onClick={() => onSetViewMode("canvas")}
+              title="Excalidraw canvas only"
               className={`px-3 py-1 ${activeViewMode === "canvas" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
             >
               Canvas

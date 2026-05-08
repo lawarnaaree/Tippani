@@ -1,10 +1,10 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { oneDark } from "@codemirror/theme-one-dark";
 import { githubLight } from "@uiw/codemirror-theme-github";
 import { useMemo } from "react";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
+import { warmDark } from "./warmDarkTheme";
 
 type Props = {
   value: string;
@@ -25,7 +25,7 @@ export function MarkdownEditor({ value, onChange }: Props) {
         value={value}
         onChange={onChange}
         extensions={extensions}
-        theme={isDark ? oneDark : githubLight}
+        theme={isDark ? warmDark : githubLight}
         height="100%"
         style={{ height: "100%" }}
         basicSetup={{

@@ -26,7 +26,7 @@ For the original strategy doc (motivation, library choices, architecture sketch,
 | F2    | Layout + Tippani aesthetic       | ✅     | 2–3 d   | F1         |
 | F3    | Command palette `⌘K`             | ✅     | 1–2 d   | F2         |
 | F4    | Excalidraw canvas                | ✅     | 3–5 d   | F2         |
-| F5    | Diagram-as-code (Mermaid)        | ⬜     | 3–4 d   | F1         |
+| F5    | Diagram-as-code (Mermaid)        | ✅     | 3–4 d   | F1         |
 | F6    | Polish, file watcher, search     | ⬜     | 3–5 d   | F1         |
 | F7    | Distribution & auto-update       | ⬜     | 1–2 d   | F1–F6      |
 | F8    | AI assist (deferred)             | 💤     | post-v1 | F7         |
@@ -145,17 +145,32 @@ For the original strategy doc (motivation, library choices, architecture sketch,
   - Using existing `note_read`/`note_write` commands instead of making new ones because `.json` is handled generically by the system.
   - Sibling canvas files are preferred over a hidden `.tippani/` subfolder to keep files discoverable like Obsidian Canvas.
 
-### F5 — Diagram-as-code (Mermaid) ⬜
+### F5 — Diagram-as-code (Mermaid) ✅
 
 - **Goal.** Inline rendering of fenced ` ```mermaid ` blocks in a preview pane; live side-by-side editor/preview for `.md` files containing diagrams; PNG/SVG export.
-- **User outcome.** Type Mermaid on the left → diagram updates live on the right → click "Export" to save PNG/SVG.
-- **Key files (to create).**
-  - `src/components/Diagram/MermaidBlock.tsx` — renders one fenced block.
-  - `src/components/Editor/PreviewPane.tsx` — markdown → HTML with diagram blocks.
-  - `src/lib/markdown.ts` — parse markdown, identify ` ```mermaid ` blocks.
-- **Libraries.** `mermaid` (already installed). D2 via `@terrastruct/d2` WASM is optional v2.
-- **Acceptance.** Diagram updates within ~250 ms of editing the source; export produces a valid PNG/SVG.
-- **Risks.** Mermaid throws on parse errors mid-typing — debounce + show inline error, don't crash.
+- **User outcome.** Type Mermaid on the left → diagram updates live on the right → click "SVG" / "PNG" to save.
+- **Implementation plan.** Companion plan at `~/.claude/plans/i-want-you-to-rosy-flute.md`.
+- **Status note.** Landed 2026-05-08. 91 Vitest tests + 10 Rust tests passing. All CI gates (tsc, vitest, build, fmt, clippy, cargo test) green locally.
+- **Files shipped.**
+  - Lib: [src/lib/markdown.ts](../src/lib/markdown.ts) (`splitMarkdown`, `renderMarkdownHtml`, `noteStem`, `hasMermaid`).
+  - Components: [src/components/Diagram/MermaidBlock.tsx](../src/components/Diagram/MermaidBlock.tsx) (debounced render, hover toolbar, SVG/PNG export), [src/components/Editor/PreviewPane.tsx](../src/components/Editor/PreviewPane.tsx).
+  - Rust: [src-tauri/src/commands/vault.rs](../src-tauri/src/commands/vault.rs) `note_write_bytes` (base64 → binary write).
+  - Updates: [src/App.tsx](../src/App.tsx) (`both` view now editor + preview), [src/components/Layout/TopBar.tsx](../src/components/Layout/TopBar.tsx) (tooltip), [src/lib/commands.ts](../src/lib/commands.ts) (label "View: Editor + Preview (Both)"), [src/lib/tauri.ts](../src/lib/tauri.ts) (`noteWriteBytes`, `pickSavePath`), [src/styles/global.css](../src/styles/global.css) (`.tippani-preview`, `.tippani-mermaid`).
+  - Tests: [tests/unit/markdown.test.ts](../tests/unit/markdown.test.ts) (14), [tests/component/PreviewPane.test.tsx](../tests/component/PreviewPane.test.tsx) (4), Rust `write_bytes_*` (2 added).
+- **Acceptance (met).**
+  - ✅ Mermaid fence in `.md` renders inline in the right pane when `viewMode === "both"`.
+  - ✅ 250 ms debounce on edit-to-render; new render cancels in-flight via cleanup flag.
+  - ✅ Export SVG opens save dialog, writes valid `<?xml ?>`-prefixed SVG.
+  - ✅ Export PNG rasterises at `2 × devicePixelRatio` over a theme-matched background, saves binary via `note_write_bytes`.
+  - ✅ Broken mermaid syntax shows inline `.tippani-mermaid-error` box; rest of preview keeps rendering.
+  - ✅ Theme cycle re-initialises mermaid (`theme: 'dark'` ↔ `'default'`) on next render pass.
+- **Notable choices.**
+  - `marked@14` + `dompurify@3` for the non-mermaid HTML pipeline; `marked.parse({ async: false })` keeps the pane synchronous.
+  - Pre-split content into `MdSegment[]` so React reconciles around mermaid blocks cleanly — no HTML string ↔ React bridging.
+  - Repurposed the `both` view from F4's editor+canvas to editor+preview (Eraser-canonical). Excalidraw remains accessible via `Canvas` view.
+  - `mermaid.initialize({ securityLevel: "strict" })` so the rendered SVG doesn't execute click handlers / arbitrary scripts from note authors.
+- **Risks.** Mermaid bundle is large (~600 KB total, but Vite splits per-diagram-type chunks lazy-loaded by mermaid itself). PNG export depends on browser SVG-image rasterisation; if a future mermaid version emits SVGs with external image refs, raster will fail — caught by the try/catch in `exportPng`.
+- **Deferred.** D2 via `@terrastruct/d2` WASM (post-v1). Bulk "Export all diagrams" command. Inline preview decorations *inside* the CodeMirror buffer (Obsidian-style live preview).
 
 ### F6 — Polish, file watcher, search ⬜
 

@@ -12,6 +12,7 @@ import { AppShell } from "./components/Layout/AppShell";
 import { TopBar } from "./components/Layout/TopBar";
 import { TabBar } from "./components/Layout/TabBar";
 import { Palette } from "./components/CommandPalette/Palette";
+import { PreviewPane } from "./components/Editor/PreviewPane";
 
 const CanvasEditor = lazy(() => import("./components/Canvas/CanvasEditor"));
 
@@ -179,9 +180,7 @@ export default function App() {
                 minSize={20}
                 className="flex flex-col relative bg-[var(--tippani-bg)] min-h-0 min-w-0"
               >
-                <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">Loading Excalidraw...</div>}>
-                  <CanvasEditor path={activePath} onOpenMenu={() => setPaletteOpen(true)} />
-                </Suspense>
+                <PreviewPane path={activePath} content={noteContent} />
               </Panel>
             </Group>
           ) : activeViewMode === "canvas" ? (

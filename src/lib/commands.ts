@@ -160,8 +160,8 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
         },
         {
           id: "action:view-both",
-          label: "View: Split mode (Both)",
-          keywords: ["view", "split", "both", "side-by-side"],
+          label: "View: Editor + Preview (Both)",
+          keywords: ["view", "split", "both", "side-by-side", "preview", "mermaid", "diagram"],
           section: "actions" as const,
           run: () => onSetViewMode("both"),
         },

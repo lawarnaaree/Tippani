@@ -9,6 +9,7 @@ pub fn run() {
             commands::vault::vault_list,
             commands::vault::note_read,
             commands::vault::note_write,
+            commands::vault::note_write_bytes,
             commands::vault::note_create,
             commands::vault::note_rename,
             commands::vault::note_delete,
