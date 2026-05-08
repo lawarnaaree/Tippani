@@ -1,0 +1,158 @@
+import { useMemo } from "react";
+import type { VaultEntry } from "./tauri";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type CommandSection = "notes" | "actions";
+
+export type Command = {
+  id: string;
+  label: string;
+  keywords?: string[];
+  shortcut?: string;
+  section: CommandSection;
+  run: () => void;
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Detect macOS / iOS for display-only shortcut labels. */
+export function isMac(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /mac|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+/** Return the platform-appropriate modifier symbol. */
+export function modKey(): string {
+  return isMac() ? "⌘" : "Ctrl";
+}
+
+/**
+ * Recursively flatten a VaultEntry tree into a list of file paths.
+ * Folders are skipped — only `.md` files become palette items.
+ */
+export function flattenEntries(entries: VaultEntry[]): VaultEntry[] {
+  const result: VaultEntry[] = [];
+  for (const entry of entries) {
+    if (entry.kind === "file") {
+      result.push(entry);
+    } else if (entry.children) {
+      result.push(...flattenEntries(entry.children));
+    }
+  }
+  return result;
+}
+
+/** Strip `.md` extension for display. */
+function displayName(filename: string): string {
+  return filename.replace(/\.md$/i, "");
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+export type UseCommandsOpts = {
+  entries: VaultEntry[];
+  onOpenNote: (path: string) => void;
+  onNewNote: () => void;
+  onChangeVault: () => void;
+  onRefreshVault: () => void;
+  onCycleTheme: () => void;
+  onCloseTab: () => void;
+  onCloseAllTabs: () => void;
+};
+
+/**
+ * Build the full command list from live store state.
+ * Memoised so the palette doesn't re-compute on every render.
+ */
+export function useCommands(opts: UseCommandsOpts): Command[] {
+  const {
+    entries,
+    onOpenNote,
+    onNewNote,
+    onChangeVault,
+    onRefreshVault,
+    onCycleTheme,
+    onCloseTab,
+    onCloseAllTabs,
+  } = opts;
+
+  return useMemo(() => {
+    const mod = modKey();
+
+    // --- Notes ---------------------------------------------------------------
+    const flat = flattenEntries(entries);
+    const noteCommands: Command[] = flat.map((entry) => ({
+      id: `note:${entry.path}`,
+      label: displayName(entry.name),
+      keywords: [entry.name, entry.path],
+      section: "notes" as const,
+      run: () => onOpenNote(entry.path),
+    }));
+
+    // --- Actions -------------------------------------------------------------
+    const actionCommands: Command[] = [
+      {
+        id: "action:new-note",
+        label: "New note",
+        keywords: ["create", "add", "file"],
+        shortcut: `${mod}+N`,
+        section: "actions" as const,
+        run: onNewNote,
+      },
+      {
+        id: "action:change-vault",
+        label: "Change vault",
+        keywords: ["open", "folder", "pick", "switch"],
+        section: "actions" as const,
+        run: onChangeVault,
+      },
+      {
+        id: "action:refresh-vault",
+        label: "Refresh vault",
+        keywords: ["reload", "sync"],
+        section: "actions" as const,
+        run: onRefreshVault,
+      },
+      {
+        id: "action:cycle-theme",
+        label: "Cycle theme",
+        keywords: ["dark", "light", "system", "mode", "toggle"],
+        shortcut: `${mod}+Shift+L`,
+        section: "actions" as const,
+        run: onCycleTheme,
+      },
+      {
+        id: "action:close-tab",
+        label: "Close current tab",
+        keywords: ["tab", "close"],
+        section: "actions" as const,
+        run: onCloseTab,
+      },
+      {
+        id: "action:close-all-tabs",
+        label: "Close all tabs",
+        keywords: ["tab", "close", "all"],
+        section: "actions" as const,
+        run: onCloseAllTabs,
+      },
+    ];
+
+    return [...noteCommands, ...actionCommands];
+  }, [
+    entries,
+    onOpenNote,
+    onNewNote,
+    onChangeVault,
+    onRefreshVault,
+    onCycleTheme,
+    onCloseTab,
+    onCloseAllTabs,
+  ]);
+}

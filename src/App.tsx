@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useVault } from "./stores/vault";
 import { useTabs } from "./stores/tabs";
 import { useSettings } from "./stores/settings";
 import { useApplyThemeOnSystemChange } from "./hooks/useResolvedTheme";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useCommands } from "./lib/commands";
 import { FileTree } from "./components/Sidebar/FileTree";
 import { MarkdownEditor } from "./components/Editor/MarkdownEditor";
 import { AppShell } from "./components/Layout/AppShell";
 import { TopBar } from "./components/Layout/TopBar";
 import { TabBar } from "./components/Layout/TabBar";
+import { Palette } from "./components/CommandPalette/Palette";
 
 export default function App() {
   // Vault
@@ -32,6 +35,7 @@ export default function App() {
   const openTab = useTabs((s) => s.openTab);
   const closeTab = useTabs((s) => s.closeTab);
   const setActiveTab = useTabs((s) => s.setActive);
+  const closeAllTabs = useTabs((s) => s.closeAll);
   const activePath = useTabs((s) => {
     if (!s.activeTabId) return null;
     return s.tabs.find((t) => t.id === s.activeTabId)?.path ?? null;
@@ -40,6 +44,10 @@ export default function App() {
   // Settings
   const theme = useSettings((s) => s.theme);
   const cycleTheme = useSettings((s) => s.cycleTheme);
+
+  // Command palette state
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarCreating, setSidebarCreating] = useState(false);
 
   // Bootstrap vault on mount
   useEffect(() => {
@@ -67,18 +75,41 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [flushPendingSave]);
 
-  // Global keyboard shortcut: Ctrl/Cmd+Shift+L cycles theme
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.shiftKey && e.key.toLowerCase() === "l") {
-        e.preventDefault();
-        cycleTheme();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [cycleTheme]);
+  // --- Palette helpers -------------------------------------------------------
+
+  const handleCloseActiveTab = useCallback(() => {
+    if (activeTabId) closeTab(activeTabId);
+  }, [activeTabId, closeTab]);
+
+  const handleNewNote = useCallback(() => {
+    setPaletteOpen(false);
+    setSidebarCreating(true);
+  }, []);
+
+  const handleOpenNote = useCallback(
+    (path: string) => {
+      openTab(path);
+    },
+    [openTab],
+  );
+
+  const commands = useCommands({
+    entries,
+    onOpenNote: handleOpenNote,
+    onNewNote: handleNewNote,
+    onChangeVault: () => void pickAndOpen(),
+    onRefreshVault: () => void refresh(),
+    onCycleTheme: cycleTheme,
+    onCloseTab: handleCloseActiveTab,
+    onCloseAllTabs: closeAllTabs,
+  });
+
+  // Global keyboard shortcuts (⌘K, ⌘P, ⌘N, ⌘Shift+L)
+  useGlobalShortcuts({
+    onTogglePalette: useCallback(() => setPaletteOpen((v) => !v), []),
+    onCycleTheme: cycleTheme,
+    onNewNote: handleNewNote,
+  });
 
   return (
     <>
@@ -100,6 +131,8 @@ export default function App() {
           activePath={activePath}
           onSelect={(p) => openTab(p)}
           onCreateNote={createNote}
+          isCreating={sidebarCreating}
+          onCreatingChange={setSidebarCreating}
         />}
         tabBar={
           <TabBar
@@ -118,6 +151,11 @@ export default function App() {
             <MarkdownEditor value={noteContent} onChange={updateNoteContent} />
           )
         }
+      />
+      <Palette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        commands={commands}
       />
       {error && <ErrorBanner text={error} />}
     </>
@@ -169,10 +207,11 @@ type SidebarContentProps = {
   activePath: string | null;
   onSelect: (path: string) => void;
   onCreateNote: (path: string) => Promise<void>;
+  isCreating: boolean;
+  onCreatingChange: (v: boolean) => void;
 };
 
-function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onCreateNote }: SidebarContentProps) {
-  const [isCreating, setIsCreating] = useState(false);
+function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onCreateNote, isCreating, onCreatingChange }: SidebarContentProps) {
   const [newFileName, setNewFileName] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,8 +219,13 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
     if (!newFileName.trim()) return;
     await onCreateNote(newFileName.trim());
     setNewFileName("");
-    setIsCreating(false);
+    onCreatingChange(false);
   };
+
+  // Auto-focus the input when external trigger (⌘N) opens create mode
+  useEffect(() => {
+    // no-op; the autoFocus on the input handles initial focus
+  }, [isCreating]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -206,7 +250,7 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
               <button
                 type="button"
                 onClick={() => {
-                  setIsCreating(false);
+                  onCreatingChange(false);
                   setNewFileName("");
                 }}
                 className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)]"
@@ -217,7 +261,7 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
           ) : (
             <button
               type="button"
-              onClick={() => setIsCreating(true)}
+              onClick={() => onCreatingChange(true)}
               className="flex w-full items-center justify-center gap-1 rounded border border-[var(--tippani-border)] px-3 py-1.5 text-xs hover:bg-[var(--tippani-hover)]"
             >
               <span>+</span>

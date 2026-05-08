@@ -24,7 +24,7 @@ For the original strategy doc (motivation, library choices, architecture sketch,
 | F0.5  | Rebrand to Tippani               | ✅     | ½ day   | F0         |
 | F1    | Vault + markdown editor          | ✅     | 3–5 d   | F0.5       |
 | F2    | Layout + Tippani aesthetic       | ✅     | 2–3 d   | F1         |
-| F3    | Command palette `⌘K`             | ⬜     | 1–2 d   | F2         |
+| F3    | Command palette `⌘K`             | ✅     | 1–2 d   | F2         |
 | F4    | Excalidraw canvas                | ⬜     | 3–5 d   | F2         |
 | F5    | Diagram-as-code (Mermaid)        | ⬜     | 3–4 d   | F1         |
 | F6    | Polish, file watcher, search     | ⬜     | 3–5 d   | F1         |
@@ -98,17 +98,32 @@ For the original strategy doc (motivation, library choices, architecture sketch,
   - localStorage polyfill in [tests/setup.ts](../tests/setup.ts) for jsdom 26 environment quirk.
 - **Deferred.** Tab drag-to-reorder; preview tabs; per-vault state file; sidebar icons rail when collapsed.
 
-### F3 — Command palette `⌘K` ⬜
+### F3 — Command palette `⌘K` ✅
 
 - **Goal.** Every common action reachable from a `⌘K` palette without the mouse.
-- **User outcome.** `⌘K` opens fuzzy search of notes + actions: open note, new note, new canvas, switch theme, change vault, etc.
-- **Key files (to create).**
-  - `src/components/CommandPalette/Palette.tsx` — `cmdk` integration.
-  - `src/lib/commands.ts` — registry of actions, each with `id`, `label`, `keywords`, `run()`.
-  - `src/hooks/useGlobalShortcuts.ts` — `⌘K`, `⌘N`, `⌘P`.
-- **Libraries.** `cmdk`.
-- **Acceptance.** `⌘K` opens overlay; typing fuzzy-matches notes and registered actions; Enter runs; Esc closes; works without a mouse.
-- **Risks.** Ergonomic regression if shortcuts collide with the editor; scope shortcuts to the right focus context.
+- **User outcome.** `⌘K` opens fuzzy search of notes + actions: open note, new note, switch theme, change vault, etc.
+- **Implementation plan.** [docs/plans/F3-command-palette.md](plans/F3-command-palette.md).
+- **Status note.** Landed 2026-05-08. 73 Vitest tests passing. All CI gates (tsc, vitest, build) green locally.
+- **Files shipped.**
+  - Lib: [src/lib/commands.ts](../src/lib/commands.ts) (`Command` type, `useCommands` hook, `flattenEntries`, `modKey`).
+  - Hooks: [src/hooks/useGlobalShortcuts.ts](../src/hooks/useGlobalShortcuts.ts) (`⌘K`, `⌘P`, `⌘N`, `⌘Shift+L` — capture phase).
+  - Components: [src/components/CommandPalette/Palette.tsx](../src/components/CommandPalette/Palette.tsx) (cmdk `Command.Dialog` wrapper).
+  - Updates: [src/App.tsx](../src/App.tsx) (wires palette state, replaces inline shortcut), [src/styles/global.css](../src/styles/global.css) (palette backdrop/dialog/item/animation styles), [tests/setup.ts](../tests/setup.ts) (ResizeObserver + scrollIntoView stubs for cmdk in jsdom).
+  - Tests: [tests/component/command-palette.test.tsx](../tests/component/command-palette.test.tsx) (14 — flattenEntries, palette rendering, item select, empty state, useGlobalShortcuts).
+- **Acceptance (met).**
+  - ✅ `⌘K` opens overlay; typing fuzzy-matches notes and registered actions; Enter runs; Esc closes.
+  - ✅ `⌘P` alias opens the palette (VS Code muscle memory).
+  - ✅ `⌘N` triggers new note flow in the sidebar.
+  - ✅ `⌘Shift+L` cycles theme (moved from inline effect to consolidated hook).
+  - ✅ Palette respects dark mode; shortcut badges display platform-aware modifier keys.
+  - ✅ Works without a mouse — full keyboard navigation.
+- **Notable choices.**
+  - `cmdk@1.1.1` `Command.Dialog` with radix overlay — built-in focus trap and accessibility.
+  - Shortcuts fire in capture phase at `window` to avoid CodeMirror conflicts.
+  - `vimBindings={false}` on cmdk to prevent `Ctrl+N/P/J/K` interference inside the palette.
+  - Sidebar creating state lifted to App so `⌘N` can trigger it from anywhere.
+- **Risks.** `cmdk`'s `Command.Dialog` renders via Radix `Dialog`; Radix logs `DialogTitle` console warnings that are suppressed in tests. No user-facing impact.
+- **Deferred.** Recently-opened ordering; contextual sub-menus; custom user commands.
 
 ### F4 — Excalidraw canvas ⬜
 

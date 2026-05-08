@@ -76,3 +76,161 @@ button {
 .tippani-resize-handle[data-resize-handle-state="drag"] {
   background-color: var(--tippani-accent);
 }
+
+/* ───────────────────────── Command Palette ───────────────────────── */
+
+/* Backdrop (radix overlay) */
+.tippani-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.45);
+  animation: tippani-fade-in 120ms ease;
+}
+
+.dark .tippani-palette-backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* Dialog container */
+.tippani-palette {
+  position: fixed;
+  z-index: 51;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 540px;
+  border-radius: 12px;
+  border: 1px solid var(--tippani-border);
+  background: var(--tippani-bg);
+  box-shadow:
+    0 16px 70px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  animation: tippani-slide-in 120ms ease;
+}
+
+.dark .tippani-palette {
+  box-shadow:
+    0 16px 70px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Header / search area */
+.tippani-palette-header {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--tippani-border);
+  padding: 0 16px;
+}
+
+.tippani-palette-input {
+  flex: 1;
+  height: 48px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--tippani-fg);
+}
+
+.tippani-palette-input::placeholder {
+  color: var(--tippani-muted);
+}
+
+/* Results list */
+.tippani-palette-list {
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+/* Group heading */
+.tippani-palette-group [cmdk-group-heading] {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tippani-muted);
+  user-select: none;
+}
+
+/* Individual item */
+.tippani-palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--tippani-fg);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 60ms ease;
+}
+
+.tippani-palette-item[data-selected="true"] {
+  background: var(--tippani-hover);
+}
+
+.tippani-palette-item:active {
+  background: var(--tippani-active);
+}
+
+/* Item label */
+.tippani-palette-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Shortcut badge */
+.tippani-palette-item-shortcut {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--tippani-muted);
+  background: var(--tippani-hover);
+  border: 1px solid var(--tippani-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.4;
+}
+
+/* Empty state */
+.tippani-palette-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--tippani-muted);
+}
+
+/* ── Animations ────────────────────────────────────────────────────── */
+
+@keyframes tippani-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tippani-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.97) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1) translateY(0);
+  }
+}
