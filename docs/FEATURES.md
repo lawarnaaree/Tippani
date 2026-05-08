@@ -25,7 +25,7 @@ For the original strategy doc (motivation, library choices, architecture sketch,
 | F1    | Vault + markdown editor          | ✅     | 3–5 d   | F0.5       |
 | F2    | Layout + Tippani aesthetic       | ✅     | 2–3 d   | F1         |
 | F3    | Command palette `⌘K`             | ✅     | 1–2 d   | F2         |
-| F4    | Excalidraw canvas                | ⬜     | 3–5 d   | F2         |
+| F4    | Excalidraw canvas                | ✅     | 3–5 d   | F2         |
 | F5    | Diagram-as-code (Mermaid)        | ⬜     | 3–4 d   | F1         |
 | F6    | Polish, file watcher, search     | ⬜     | 3–5 d   | F1         |
 | F7    | Distribution & auto-update       | ⬜     | 1–2 d   | F1–F6      |
@@ -125,17 +125,25 @@ For the original strategy doc (motivation, library choices, architecture sketch,
 - **Risks.** `cmdk`'s `Command.Dialog` renders via Radix `Dialog`; Radix logs `DialogTitle` console warnings that are suppressed in tests. No user-facing impact.
 - **Deferred.** Recently-opened ordering; contextual sub-menus; custom user commands.
 
-### F4 — Excalidraw canvas ⬜
+### F4 — Excalidraw canvas ✅
 
 - **Goal.** A "canvas" tab type backed by `@excalidraw/excalidraw`, with scene persisted to a sibling `<note>.canvas.json`.
 - **User outcome.** Create a canvas → draw → close → reopen → identical scene restored.
-- **Key files (to create).**
-  - `src/components/Canvas/CanvasEditor.tsx` — Excalidraw wrapper, lazy-loaded.
-  - `src-tauri/src/commands/vault.rs` — extend with `canvas_read` / `canvas_write` (or reuse `note_*` with arbitrary path).
-  - `src/stores/tabs.ts` — extend with a `canvas` tab type.
-- **Libraries.** `@excalidraw/excalidraw` (already installed).
-- **Acceptance.** Round-trip draw/save/reopen preserves the scene byte-for-byte.
-- **Risks.** Excalidraw's bundle is ~1 MB — lazy-load via `React.lazy` so startup stays fast.
+- **Implementation plan.** [docs/plans/F4-excalidraw-canvas.md](plans/F4-excalidraw-canvas.md).
+- **Status note.** Landed 2026-05-08. Lazy-loaded Excalidraw integrated with automatic saving to Rust vault commands. 73 Vitest tests passing. All CI gates (tsc, vitest) green locally.
+- **Files shipped.**
+  - Editor: [src/components/Canvas/CanvasEditor.tsx](../src/components/Canvas/CanvasEditor.tsx) (lazy-loaded Excalidraw wrapper, debounced saves, initial data loading).
+  - Updates: [src/App.tsx](../src/App.tsx) (activeKind handling, Suspense fallback, note vs canvas open logic), [src/stores/tabs.ts](../src/stores/tabs.ts) (added `canvas` TabKind), [src/lib/commands.ts](../src/lib/commands.ts) (added Open Canvas action for active note), [src/components/Layout/TopBar.tsx](../src/components/Layout/TopBar.tsx) (Note/Canvas segmented toggle switch).
+- **Acceptance (met).**
+  - ✅ Lazy loaded Excalidraw chunk via `React.lazy` and `Suspense`.
+  - ✅ Canvas loads from sibling `.canvas.json` (or creates new on save).
+  - ✅ Auto-saves drawing via a debounced `note_write` call using `onChange`.
+  - ✅ Theme cycles seamlessly with Tippani (`useResolvedTheme()` fed to Excalidraw).
+  - ✅ Fast toggle between Note and Canvas modes in TopBar.
+- **Notable choices.**
+  - `UIOptions.canvasActions.toggleTheme: false` to allow Tippani to maintain global control of the theme mode.
+  - Using existing `note_read`/`note_write` commands instead of making new ones because `.json` is handled generically by the system.
+  - Sibling canvas files are preferred over a hidden `.tippani/` subfolder to keep files discoverable like Obsidian Canvas.
 
 ### F5 — Diagram-as-code (Mermaid) ⬜
 

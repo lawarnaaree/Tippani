@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense, lazy } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import { useVault } from "./stores/vault";
-import { useTabs } from "./stores/tabs";
+import { useTabs, type ViewMode } from "./stores/tabs";
 import { useSettings } from "./stores/settings";
 import { useApplyThemeOnSystemChange } from "./hooks/useResolvedTheme";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
@@ -11,6 +12,8 @@ import { AppShell } from "./components/Layout/AppShell";
 import { TopBar } from "./components/Layout/TopBar";
 import { TabBar } from "./components/Layout/TabBar";
 import { Palette } from "./components/CommandPalette/Palette";
+
+const CanvasEditor = lazy(() => import("./components/Canvas/CanvasEditor"));
 
 export default function App() {
   // Vault
@@ -35,11 +38,15 @@ export default function App() {
   const openTab = useTabs((s) => s.openTab);
   const closeTab = useTabs((s) => s.closeTab);
   const setActiveTab = useTabs((s) => s.setActive);
+  const setViewMode = useTabs((s) => s.setViewMode);
   const closeAllTabs = useTabs((s) => s.closeAll);
-  const activePath = useTabs((s) => {
+  
+  const activeTabInfo = useTabs((s) => {
     if (!s.activeTabId) return null;
-    return s.tabs.find((t) => t.id === s.activeTabId)?.path ?? null;
+    return s.tabs.find((t) => t.id === s.activeTabId) ?? null;
   });
+  const activePath = activeTabInfo?.path ?? null;
+  const activeViewMode = activeTabInfo?.viewMode ?? null;
 
   // Settings
   const theme = useSettings((s) => s.theme);
@@ -56,12 +63,14 @@ export default function App() {
 
   // Mirror active tab → editor
   useEffect(() => {
+    // Only open the note for markdown tabs to load the text content.
+    // Canvas handles its own file loading.
     if (activePath === null) {
       void clearActive();
-    } else {
+    } else if (activeViewMode === "document" || activeViewMode === "both") {
       void openNote(activePath);
     }
-  }, [activePath, openNote, clearActive]);
+  }, [activePath, activeViewMode, openNote, clearActive]);
 
   // Re-apply theme when OS preference changes (only matters for "system" mode)
   useApplyThemeOnSystemChange();
@@ -95,7 +104,11 @@ export default function App() {
 
   const commands = useCommands({
     entries,
+    activePath,
     onOpenNote: handleOpenNote,
+    onSetViewMode: (mode: ViewMode) => {
+      if (activePath) setViewMode(activePath, mode);
+    },
     onNewNote: handleNewNote,
     onChangeVault: () => void pickAndOpen(),
     onRefreshVault: () => void refresh(),
@@ -119,9 +132,13 @@ export default function App() {
             vaultPath={vaultPath}
             saveState={saveState}
             theme={theme}
+            activeViewMode={activeViewMode}
             onPickVault={() => void pickAndOpen()}
             onRefresh={() => void refresh()}
             onCycleTheme={cycleTheme}
+            onSetViewMode={(mode: ViewMode) => {
+              if (activePath) setViewMode(activePath, mode);
+            }}
           />
         }
         sidebar={<SidebarContent
@@ -147,6 +164,30 @@ export default function App() {
             <EmptyState onPick={() => void pickAndOpen()} />
           ) : activePath === null ? (
             <NoNoteSelected />
+          ) : activeViewMode === "both" ? (
+            <Group orientation="horizontal" className="flex h-full w-full">
+              <Panel
+                defaultSize={50}
+                minSize={20}
+                className="flex flex-col relative bg-[var(--tippani-bg)] min-h-0 min-w-0"
+              >
+                <MarkdownEditor value={noteContent} onChange={updateNoteContent} />
+              </Panel>
+              <Separator className="tippani-resize-handle" />
+              <Panel
+                defaultSize={50}
+                minSize={20}
+                className="flex flex-col relative bg-[var(--tippani-bg)] min-h-0 min-w-0"
+              >
+                <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">Loading Excalidraw...</div>}>
+                  <CanvasEditor path={activePath} onOpenMenu={() => setPaletteOpen(true)} />
+                </Suspense>
+              </Panel>
+            </Group>
+          ) : activeViewMode === "canvas" ? (
+            <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">Loading Excalidraw...</div>}>
+              <CanvasEditor path={activePath} onOpenMenu={() => setPaletteOpen(true)} />
+            </Suspense>
           ) : (
             <MarkdownEditor value={noteContent} onChange={updateNoteContent} />
           )
@@ -243,7 +284,7 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
               />
               <button
                 type="submit"
-                className="rounded bg-[var(--tippani-accent)] px-2 py-1 text-xs text-white hover:opacity-90"
+                className="rounded bg-[var(--tippani-accent)] px-2 py-1 text-xs text-[var(--tippani-bg)] hover:opacity-90"
               >
                 Create
               </button>

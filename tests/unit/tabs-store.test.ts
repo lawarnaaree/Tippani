@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createTabsStore, tabIdFor, deriveTitle } from "../../src/stores/tabs";
+import { createTabsStore, deriveTitle } from "../../src/stores/tabs";
 
 type Store = ReturnType<typeof createTabsStore>;
 let store: Store;
@@ -11,7 +11,7 @@ beforeEach(() => {
 describe("openTab", () => {
   it("creates a new tab and makes it active", () => {
     const id = store.getState().openTab("/v/a.md");
-    expect(id).toBe(tabIdFor("/v/a.md", "markdown"));
+    expect(id).toBe("/v/a.md");
     expect(store.getState().tabs).toHaveLength(1);
     expect(store.getState().activeTabId).toBe(id);
   });

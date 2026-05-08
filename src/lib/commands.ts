@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { VaultEntry } from "./tauri";
+import type { ViewMode } from "../stores/tabs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,7 +59,9 @@ function displayName(filename: string): string {
 
 export type UseCommandsOpts = {
   entries: VaultEntry[];
+  activePath: string | null;
   onOpenNote: (path: string) => void;
+  onSetViewMode: (mode: ViewMode) => void;
   onNewNote: () => void;
   onChangeVault: () => void;
   onRefreshVault: () => void;
@@ -74,7 +77,9 @@ export type UseCommandsOpts = {
 export function useCommands(opts: UseCommandsOpts): Command[] {
   const {
     entries,
+    activePath,
     onOpenNote,
+    onSetViewMode,
     onNewNote,
     onChangeVault,
     onRefreshVault,
@@ -144,10 +149,38 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
       },
     ];
 
+    if (activePath) {
+      actionCommands.push(
+        {
+          id: "action:view-document",
+          label: "View: Document only",
+          keywords: ["view", "document", "markdown", "text", "note"],
+          section: "actions" as const,
+          run: () => onSetViewMode("document"),
+        },
+        {
+          id: "action:view-both",
+          label: "View: Split mode (Both)",
+          keywords: ["view", "split", "both", "side-by-side"],
+          section: "actions" as const,
+          run: () => onSetViewMode("both"),
+        },
+        {
+          id: "action:view-canvas",
+          label: "View: Canvas only",
+          keywords: ["view", "canvas", "draw", "whiteboard", "excalidraw"],
+          section: "actions" as const,
+          run: () => onSetViewMode("canvas"),
+        }
+      );
+    }
+
     return [...noteCommands, ...actionCommands];
   }, [
     entries,
+    activePath,
     onOpenNote,
+    onSetViewMode,
     onNewNote,
     onChangeVault,
     onRefreshVault,

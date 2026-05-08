@@ -2,6 +2,14 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
 :root {
   --tippani-bg: #ffffff;
   --tippani-fg: #111114;
@@ -219,6 +227,7 @@ button {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -229,8 +238,445 @@ button {
     opacity: 0;
     transform: translateX(-50%) scale(0.97) translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateX(-50%) scale(1) translateY(0);
   }
+}
+
+/* ──────────────────────── Excalidraw — Tippani Theme ──────────────────────── */
+/*
+ * The canvas is rendered by @excalidraw/excalidraw, which has its own DOM
+ * structure for desktop vs mobile. Tippani's CanvasEditor adds the wrapper
+ * class `.excalidraw-eraser-theme` so all of these rules are scoped.
+ *
+ * Layout intent (Canvas + Both views), tight stacking from the bottom up:
+ *   • bottom: 16px  — Shape toolbar (always, centered)
+ *   • bottom: 72px  — Footer row: tippani-canvas-actions (Canvas, when selected)
+ *                     OR footer.App-toolbar (mobile)
+ *                     OR App-menu_bottom (Canvas, when nothing selected)
+ *   • bottom: 128px — App-menu_bottom (Canvas, pushed up when selection tools
+ *                     are visible) / Properties panel (when selected, alone)
+ *   • bottom: 184px — Properties panel (when both selection tools AND it show)
+ */
+
+/* 1. Theme tokens — let Excalidraw inherit Tippani's surface colors. */
+.excalidraw-eraser-theme .excalidraw {
+  --color-surface-low: var(--tippani-bg) !important;
+  --color-surface-high: var(--tippani-sidebar) !important;
+  background-color: transparent !important;
+  touch-action: none !important;
+}
+
+/* 2. SHAPE TOOLBAR
+ *    Desktop DOM:  <div class="Island App-toolbar">…</div>           (inside App-menu_top middle slot)
+ *    Mobile DOM:   <div class="Island App-toolbar App-toolbar--mobile">…</div>
+ *
+ *    Strategy: in desktop mode, relocate the entire .App-menu_top container
+ *    (a 3-column grid) to the bottom — that drags the shape toolbar with it.
+ *    In mobile mode, the toolbar isn't inside .App-menu_top, so we pin
+ *    .App-toolbar directly. Both end up centered at bottom: 64px. */
+
+.excalidraw-eraser-theme .excalidraw:not(.excalidraw--mobile) .App-menu_top {
+  position: absolute !important;
+  inset: auto 0 16px 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 16px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  z-index: 100 !important;
+  visibility: visible !important;
+}
+
+.excalidraw-eraser-theme .App-menu_top>* {
+  pointer-events: auto !important;
+}
+
+/* Hide first and last grid items (hamburger + library/lock cluster) */
+.excalidraw-eraser-theme .App-menu_top>*:first-child,
+.excalidraw-eraser-theme .App-menu_top>*:last-child {
+  display: none !important;
+}
+
+/* Mobile shape toolbar — pin directly */
+.excalidraw-eraser-theme .excalidraw--mobile .App-toolbar.Island,
+.excalidraw-eraser-theme .App-toolbar--mobile {
+  position: absolute !important;
+  inset: auto auto 16px 50% !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  z-index: 100 !important;
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* Theme + horizontal layout for the shape toolbar (desktop and mobile) */
+.excalidraw-eraser-theme .App-toolbar:not(footer) {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  max-width: calc(100% - 32px) !important;
+  background-color: var(--tippani-bg) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  overflow-x: auto !important;
+}
+
+.dark .excalidraw-eraser-theme .App-toolbar:not(footer) {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.excalidraw-eraser-theme .App-toolbar:not(footer)>.Stack {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 3. FOOTER TOOLBAR (mobile only)
+ *    DOM: <footer class="App-toolbar">
+ *      <div class="App-toolbar-content">
+ *        <button>hamburger</button>
+ *        <button>edit</button> <button>duplicate</button> <button>delete</button>
+ *        <div>                              ← anonymous, no flex by default
+ *          <button>undo</button> <button>redo</button>
+ *        </div>
+ *      </div>
+ *    </footer>
+ *    Pin centered at bottom: 64px (above the shape toolbar). */
+.excalidraw-eraser-theme footer.App-toolbar {
+  position: absolute !important;
+  inset: auto auto 72px 50% !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100% - 32px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  z-index: 99 !important;
+}
+
+.excalidraw-eraser-theme footer.App-toolbar .App-toolbar-content {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  margin: 0 !important;
+  background-color: var(--tippani-bg) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .excalidraw-eraser-theme footer.App-toolbar .App-toolbar-content {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* The undo/redo pair lives in an anonymous <div> with no flex — force horizontal */
+.excalidraw-eraser-theme footer.App-toolbar .App-toolbar-content>div {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 2px !important;
+  margin: 0 !important;
+}
+
+/* 4. PROPERTIES PANEL (.App-menu__left, desktop) — appears when an element is
+ *    selected. Float above both the shape toolbar AND the footer cluster. */
+.excalidraw-eraser-theme .App-menu__left {
+  position: absolute !important;
+  inset: auto auto 96px 50% !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100% - 32px) !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  z-index: 101 !important;
+}
+
+.excalidraw-eraser-theme .App-menu__left .Island {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 8px 12px !important;
+  background-color: var(--tippani-bg) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .excalidraw-eraser-theme .App-menu__left .Island {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.excalidraw-eraser-theme .App-menu__left .panelColumn {
+  row-gap: 0.25rem;
+}
+
+/* 5. FOOTER CLUSTER (App-menu_bottom)
+ *    Desktop: contains zoom + undo + library + help. Reposition centered above
+ *    the shape toolbar so Canvas view gets the same footer-style island that
+ *    mobile (Both view) gets via footer.App-toolbar.
+ *    Mobile: hidden — its functionality is in footer.App-toolbar instead. */
+.excalidraw-eraser-theme .excalidraw--mobile .App-menu_bottom {
+  display: none !important;
+}
+
+.excalidraw-eraser-theme .excalidraw:not(.excalidraw--mobile) .App-menu_bottom {
+  position: absolute !important;
+  inset: auto auto 85px 50% !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100% - 32px) !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  z-index: 99 !important;
+}
+
+.excalidraw-eraser-theme .excalidraw:not(.excalidraw--mobile) .App-menu_bottom>* {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  margin: 0 !important;
+}
+
+.excalidraw-eraser-theme .App-menu_bottom .Island {
+  background-color: var(--tippani-bg) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  padding: 4px !important;
+}
+
+.dark .excalidraw-eraser-theme .App-menu_bottom .Island {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 7. CUSTOM CANVAS ACTIONS FOOTER (Canvas view, when an element is selected)
+ *    Rendered by CanvasEditor via Excalidraw's <Footer> slot. Mirrors the
+ *    mobile <footer class="App-toolbar"> island so Canvas view gets the same
+ *    selection-context cluster (menu + duplicate + delete + undo + redo).
+ *    Excalidraw mounts the Footer slot inside .layer-ui__wrapper__footer-center
+ *    near the bottom of the canvas; we absolute-position our island so it
+ *    sits at bottom: 64px (same row App-menu_bottom uses when no selection). */
+.excalidraw-eraser-theme .tippani-canvas-actions {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 50px !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  background-color: var(--tippani-bg) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  z-index: 99 !important;
+  pointer-events: auto;
+}
+
+.dark .excalidraw-eraser-theme .tippani-canvas-actions {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.excalidraw-eraser-theme .tippani-canvas-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tippani-fg);
+  cursor: pointer;
+  transition: background-color 60ms ease;
+}
+
+.excalidraw-eraser-theme .tippani-canvas-actions button:hover {
+  background-color: var(--tippani-hover);
+}
+
+.excalidraw-eraser-theme .tippani-canvas-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.excalidraw-eraser-theme .tippani-canvas-actions-history {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+.excalidraw-eraser-theme .tippani-canvas-actions-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--tippani-border);
+  margin: 0 2px;
+}
+
+/* Syntax highlighting for code preview in canvas - Light mode */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6a9955;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #0000ff;
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #a31515;
+}
+
+.hljs-number,
+.hljs-deletion {
+  color: #098658;
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: #267f99;
+}
+
+.hljs-function .hljs-title {
+  color: #795e26;
+}
+
+/* Dark mode syntax highlighting - specific to code preview panel */
+.bg-\[\#0d1117\] .hljs,
+[data-theme="dark"] .hljs {
+  color: #c9d1d9;
+}
+
+.bg-\[\#0d1117\] .hljs-comment,
+.bg-\[\#0d1117\] .hljs-quote,
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote {
+  color: #8b949e;
+}
+
+.bg-\[\#0d1117\] .hljs-keyword,
+.bg-\[\#0d1117\] .hljs-selector-tag,
+.bg-\[\#0d1117\] .hljs-subst,
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-subst {
+  color: #ff7b72;
+}
+
+.bg-\[\#0d1117\] .hljs-string,
+.bg-\[\#0d1117\] .hljs-title,
+.bg-\[\#0d1117\] .hljs-section,
+.bg-\[\#0d1117\] .hljs-attribute,
+.bg-\[\#0d1117\] .hljs-literal,
+.bg-\[\#0d1117\] .hljs-template-tag,
+.bg-\[\#0d1117\] .hljs-template-variable,
+.bg-\[\#0d1117\] .hljs-type,
+.bg-\[\#0d1117\] .hljs-addition,
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-template-tag,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-addition {
+  color: #a5d6ff;
+}
+
+.bg-\[\#0d1117\] .hljs-number,
+.bg-\[\#0d1117\] .hljs-deletion,
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-deletion {
+  color: #79c0ff;
+}
+
+.bg-\[\#0d1117\] .hljs-built_in,
+.bg-\[\#0d1117\] .hljs-class .hljs-title,
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-class .hljs-title {
+  color: #ffa657;
+}
+
+.bg-\[\#0d1117\] .hljs-function .hljs-title,
+[data-theme="dark"] .hljs-function .hljs-title {
+  color: #d2a8ff;
+}
+
+.bg-\[\#0d1117\] .hljs-variable,
+.bg-\[\#0d1117\] .hljs-params,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-params {
+  color: #ffa657;
+}
+
+.bg-\[\#0d1117\] .hljs-property,
+[data-theme="dark"] .hljs-property {
+  color: #79c0ff;
+}
+
+/* When the custom actions footer is visible, push the App-menu_bottom (zoom +
+   undo + library + help) up one row so the two clusters don't stack on each
+   other. Without an element selected, App-menu_bottom stays at bottom: 64px. */
+.excalidraw-eraser-theme .excalidraw:has(.tippani-canvas-actions) .App-menu_bottom {
+  bottom: 128px !important;
+}
+
+.excalidraw-eraser-theme .excalidraw:has(.tippani-canvas-actions) .App-menu__left {
+  bottom: 184px !important;
+}
+
+/* Ensure properties panel is always visible when an element is selected,
+   regardless of view mode (both or canvas-only) */
+.excalidraw-eraser-theme .App-menu__left {
+  display: flex !important;
+}
+
+/* 6. CLUTTER REMOVAL
+ *    - HintViewer: tooltip-like instructional text
+ *    - top-right floating cluster (book/lock/hand): redundant in our layout
+ *    - ToolIcon__keybinding: the "1 / 2 / 3 …" numbers under each shape icon
+ *    NOTE: extras-trigger (shape library / more shapes button) intentionally
+ *    NOT hidden — the user wants it accessible in Canvas view too. */
+.excalidraw-eraser-theme .HintViewer,
+.excalidraw-eraser-theme .layer-ui__wrapper__top-right,
+.excalidraw-eraser-theme .ToolIcon__keybinding {
+  display: none !important;
 }

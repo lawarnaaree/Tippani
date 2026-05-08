@@ -1,0 +1,570 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Excalidraw, Footer, useDevice } from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css";
+import { useResolvedTheme } from "../../hooks/useResolvedTheme";
+import { invoke } from "@tauri-apps/api/core";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
+import "highlight.js/styles/github.css";
+
+type Props = {
+  path: string;
+  onOpenMenu?: () => void;
+};
+
+type CodeBlock = {
+  id: string;
+  language: string;
+  code: string;
+  highlighted: string;
+};
+
+export default function CanvasEditor({ path, onOpenMenu }: Props) {
+  const [initialData, setInitialData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [api, setApi] = useState<any>(null);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [selectedCodeBlock, setSelectedCodeBlock] = useState<CodeBlock | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const theme = useResolvedTheme();
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const prevSelectedIdRef = useRef<string | null>(null);
+  const isDark = theme === "dark";
+
+  const canvasPath = path.replace(/\.md$/i, ".canvas.json");
+
+  useEffect(() => {
+    let active = true;
+    invoke<string>("note_read", { path: canvasPath })
+      .then((content) => {
+        if (!active) return;
+        if (content.trim()) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed && typeof parsed === "object") {
+              delete parsed.appState;
+              setInitialData(parsed);
+            } else {
+              setInitialData(null);
+            }
+          } catch (err) {
+            console.error("Failed to parse canvas JSON", err);
+            setInitialData(null);
+          }
+        } else {
+          setInitialData(null);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not read canvas, assuming empty:", err);
+        if (active) setInitialData(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canvasPath]);
+
+  // Pinch-to-zoom for trackpads (wheel event with ctrl key)
+  useEffect(() => {
+    if (!api) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Tracking for multi-touch (if the trackpad supports it)
+    const activePointers = new Map<number, { x: number, y: number }>();
+    let lastDist = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      // In many environments, pinch is sent as a wheel event with ctrlKey: true
+      if (e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const appState = api.getAppState();
+        const currentZoom = appState?.zoom?.value ?? 1;
+
+        // Figma/Google Maps style logarithmic smooth zoom
+        const delta = e.deltaY;
+        const zoomFactor = Math.exp(-delta / 500);
+        const newZoom = Math.max(0.1, Math.min(10, currentZoom * zoomFactor));
+
+        api.updateScene({
+          appState: { ...appState, zoom: { value: newZoom } },
+        });
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        
+        if (lastDist > 0) {
+          const appState = api.getAppState();
+          const currentZoom = appState?.zoom?.value ?? 1;
+          const ratio = dist / lastDist;
+          const newZoom = Math.max(0.1, Math.min(10, currentZoom * ratio));
+          
+          api.updateScene({
+            appState: { ...appState, zoom: { value: newZoom } },
+          });
+        }
+        lastDist = dist;
+        e.preventDefault();
+      }
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) lastDist = 0;
+    };
+
+    // Global listener for the Ctrl + Wheel pinch
+    window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+    window.addEventListener("pointerdown", handlePointerDown, { capture: true });
+    window.addEventListener("pointermove", handlePointerMove, { passive: false, capture: true });
+    window.addEventListener("pointerup", handlePointerUp, { capture: true });
+    window.addEventListener("pointercancel", handlePointerUp, { capture: true });
+    
+    return () => {
+      window.removeEventListener("wheel", handleWheel, { capture: true });
+      window.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+      window.removeEventListener("pointermove", handlePointerMove, { capture: true });
+      window.removeEventListener("pointerup", handlePointerUp, { capture: true });
+      window.removeEventListener("pointercancel", handlePointerUp, { capture: true });
+    };
+  }, [api]);
+
+  const handleChange = useCallback(
+    (elements: readonly any[], appState: any, files: any) => {
+      const selectedIds = appState?.selectedElementIds ?? {};
+      const hasAnySelection = Object.values(selectedIds).some(Boolean);
+      setHasSelection(hasAnySelection);
+
+      // Only process code blocks when selection changes to avoid infinite loops
+      const selectedElementIds = Object.keys(selectedIds).filter((id) => selectedIds[id]);
+      const currentSelectedId = selectedElementIds[0] || null;
+      
+      if (currentSelectedId !== prevSelectedIdRef.current) {
+        prevSelectedIdRef.current = currentSelectedId;
+        
+        // Check if a text element with code is selected
+        if (hasAnySelection && api) {
+          const selectedElements = elements.filter((el: any) => selectedIds[el.id]);
+          const selectedTextElement = selectedElements.find((el: any) => el.type === "text");
+          if (selectedTextElement?.text) {
+            const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/;
+            const match = selectedTextElement.text.match(codeBlockRegex);
+            if (match) {
+              const language = match[1] || "plaintext";
+              const code = match[2].trim();
+              try {
+                const highlighted = hljs.highlight(code, { language }).value;
+                setSelectedCodeBlock({
+                  id: selectedTextElement.id,
+                  language,
+                  code,
+                  highlighted,
+                });
+              } catch {
+                setSelectedCodeBlock({
+                  id: selectedTextElement.id,
+                  language: "plaintext",
+                  code,
+                  highlighted: hljs.highlight(code, { language: "plaintext" }).value,
+                });
+              }
+            } else {
+              setSelectedCodeBlock(null);
+            }
+          } else {
+            setSelectedCodeBlock(null);
+          }
+        } else if (!hasAnySelection) {
+          setSelectedCodeBlock(null);
+        }
+      }
+
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = setTimeout(() => {
+        const data = JSON.stringify({ elements, files });
+        invoke("note_write", { path: canvasPath, content: data }).catch(
+          console.error,
+        );
+      }, 1000);
+    },
+    [canvasPath, api],
+  );
+
+  const handleDelete = useCallback(() => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const appState = api.getAppState();
+    const selected = appState.selectedElementIds || {};
+    const filtered = elements.filter((el: any) => !selected[el.id]);
+    api.updateScene({
+      elements: filtered,
+      appState: { ...appState, selectedElementIds: {} },
+    });
+  }, [api]);
+
+  const handleDuplicate = useCallback(() => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const appState = api.getAppState();
+    const selected = appState.selectedElementIds || {};
+    const newId = () =>
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const duplicates = elements
+      .filter((el: any) => selected[el.id])
+      .map((el: any) => ({
+        ...el,
+        id: newId(),
+        x: el.x + 20,
+        y: el.y + 20,
+        seed: Math.floor(Math.random() * 2_000_000_000),
+        versionNonce: Math.floor(Math.random() * 2_000_000_000),
+      }));
+    if (duplicates.length === 0) return;
+    const newSelected: Record<string, boolean> = {};
+    duplicates.forEach((el: any) => {
+      newSelected[el.id] = true;
+    });
+    api.updateScene({
+      elements: [...elements, ...duplicates],
+      appState: { ...appState, selectedElementIds: newSelected },
+    });
+  }, [api]);
+
+  const dispatchHistoryKey = useCallback((shift: boolean) => {
+    const target =
+      containerRef.current?.querySelector(".excalidraw") ?? document;
+    const isMac =
+      typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const ev = new KeyboardEvent("keydown", {
+      key: "z",
+      code: "KeyZ",
+      ctrlKey: !isMac,
+      metaKey: isMac,
+      shiftKey: shift,
+      bubbles: true,
+      cancelable: true,
+    });
+    (target as EventTarget).dispatchEvent(ev);
+  }, []);
+
+  const handleUndo = useCallback(() => dispatchHistoryKey(false), [dispatchHistoryKey]);
+  const handleRedo = useCallback(() => dispatchHistoryKey(true), [dispatchHistoryKey]);
+
+  if (loading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">
+        Loading canvas...
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex-1 overflow-hidden min-h-0 min-w-0 h-full w-full excalidraw-eraser-theme"
+    >
+      <Excalidraw
+        excalidrawAPI={(apiRef: any) => setApi(apiRef)}
+        theme={theme}
+        initialData={initialData}
+        onChange={handleChange}
+        UIOptions={{
+          canvasActions: {
+            toggleTheme: false,
+            loadScene: false,
+            saveToActiveFile: false,
+            export: false,
+            saveAsImage: false,
+            changeViewBackgroundColor: false,
+            clearCanvas: false,
+          },
+          tools: {
+            image: false,
+          },
+        }}
+      >
+        <DesktopActionsFooter
+          api={api}
+          visible={hasSelection}
+          onMenu={onOpenMenu}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+        />
+      </Excalidraw>
+      {selectedCodeBlock && (
+        <CodePreview
+          codeBlock={selectedCodeBlock}
+          isDark={isDark}
+          onClose={() => setSelectedCodeBlock(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DesktopActionsFooter({
+  api,
+  visible,
+  onMenu,
+  onDuplicate,
+  onDelete,
+  onUndo,
+  onRedo,
+}: {
+  api: any;
+  visible: boolean;
+  onMenu?: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}) {
+  const device = useDevice();
+  if (device.viewport.isMobile) return null;
+  if (!visible) return null;
+
+  const setTool = (type: string) => {
+    if (api) {
+      api.setActiveTool({ type });
+    }
+  };
+
+  return (
+    <Footer>
+      <div className="tippani-canvas-actions" data-tippani-footer="canvas">
+        <button
+          type="button"
+          onClick={() => onMenu?.()}
+          aria-label="Menu"
+          title="Open command palette (⌘K)"
+        >
+          <MenuIcon />
+        </button>
+
+        <div className="tippani-canvas-actions-divider" />
+        <button
+          type="button"
+          onClick={() => setTool("selection")}
+          aria-label="Selection"
+          title="Selection (V)"
+        >
+          <SelectionIcon />
+        </button>
+
+        <div className="tippani-canvas-actions-divider" />
+        <button
+          type="button"
+          onClick={onDuplicate}
+          aria-label="Duplicate"
+          title="Duplicate"
+        >
+          <DuplicateIcon />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label="Delete"
+          title="Delete"
+        >
+          <DeleteIcon />
+        </button>
+        <div className="tippani-canvas-actions-history">
+          <button
+            type="button"
+            onClick={onUndo}
+            aria-label="Undo"
+            title="Undo (Ctrl+Z)"
+          >
+            <UndoIcon />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            aria-label="Redo"
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <RedoIcon />
+          </button>
+        </div>
+      </div>
+    </Footer>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
+function DuplicateIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <g strokeWidth="1.25">
+        <path d="M14.375 6.458H8.958a2.5 2.5 0 0 0-2.5 2.5v5.417a2.5 2.5 0 0 0 2.5 2.5h5.417a2.5 2.5 0 0 0 2.5-2.5V8.958a2.5 2.5 0 0 0-2.5-2.5Z" />
+        <path
+          clipRule="evenodd"
+          d="M11.667 3.125c.517 0 .986.21 1.325.55.34.338.55.807.55 1.325v1.458H8.333c-.485 0-.927.185-1.26.487-.343.312-.57.75-.609 1.24l-.005 5.357H5a1.87 1.87 0 0 1-1.326-.55 1.87 1.87 0 0 1-.549-1.325V5c0-.518.21-.987.55-1.326.338-.34.807-.549 1.325-.549h6.667Z"
+        />
+      </g>
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path
+        strokeWidth="1.25"
+        d="M3.333 5.833h13.334M8.333 9.167v5M11.667 9.167v5M4.167 5.833l.833 10c0 .92.746 1.667 1.667 1.667h6.666c.92 0 1.667-.746 1.667-1.667l.833-10M7.5 5.833v-2.5c0-.46.373-.833.833-.833h3.334c.46 0 .833.373.833.833v2.5"
+      />
+    </svg>
+  );
+}
+
+function UndoIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path
+        d="M7.5 10.833 4.167 7.5 7.5 4.167M4.167 7.5h9.166a3.333 3.333 0 0 1 0 6.667H12.5"
+        strokeWidth="1.25"
+      />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path
+        d="M12.5 10.833 15.833 7.5 12.5 4.167M15.833 7.5H6.667a3.333 3.333 0 1 0 0 6.667H7.5"
+        strokeWidth="1.25"
+      />
+    </svg>
+  );
+}
+
+function SelectionIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function CodePreview({
+  codeBlock,
+  isDark,
+  onClose,
+}: {
+  codeBlock: CodeBlock;
+  isDark: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute top-4 right-4 z-50 max-w-md w-[400px]">
+      <div
+        className={`rounded-lg border shadow-lg overflow-hidden ${
+          isDark ? "border-[var(--tippani-border)] bg-[#0d1117]" : "border-[var(--tippani-border)] bg-white"
+        }`}
+      >
+        <div
+          className={`flex items-center justify-between px-3 py-2 border-b ${
+            isDark ? "border-[var(--tippani-border)] bg-[#161b22]" : "border-[var(--tippani-border)] bg-[#f6f8fa]"
+          }`}
+        >
+          <span className={`text-xs font-medium ${isDark ? "text-[#c9d1d9]" : "text-[#24292f]"}`}>
+            {codeBlock.language}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`text-xs px-2 py-1 rounded hover:opacity-80 ${
+              isDark ? "text-[#c9d1d9] hover:bg-[#21262d]" : "text-[#24292f] hover:bg-[#eaeef2]"
+            }`}
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[300px] overflow-auto">
+          <pre className="p-3 text-xs leading-relaxed">
+            <code
+              className={`hljs ${isDark ? "github-dark" : "github"}`}
+              dangerouslySetInnerHTML={{ __html: codeBlock.highlighted }}
+            />
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}

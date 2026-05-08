@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
-export type TabKind = "markdown";
+export type ViewMode = "document" | "both" | "canvas";
 
 export type Tab = {
-  id: string;
+  id: string; // The id is now just the file path
   path: string;
-  kind: TabKind;
+  viewMode: ViewMode;
   title: string;
 };
 
@@ -13,15 +13,12 @@ export type TabsState = {
   tabs: Tab[];
   activeTabId: string | null;
 
-  openTab: (path: string, kind?: TabKind) => string;
+  openTab: (path: string) => string;
   closeTab: (id: string) => void;
   setActive: (id: string) => void;
+  setViewMode: (id: string, mode: ViewMode) => void;
   closeAll: () => void;
 };
-
-export function tabIdFor(path: string, kind: TabKind): string {
-  return `${kind}:${path}`;
-}
 
 export function deriveTitle(path: string): string {
   const last = path.split(/[/\\]/).pop() ?? path;
@@ -33,14 +30,14 @@ export function createTabsStore() {
     tabs: [],
     activeTabId: null,
 
-    openTab: (path, kind = "markdown") => {
-      const id = tabIdFor(path, kind);
+    openTab: (path) => {
+      const id = path;
       const existing = get().tabs.find((t) => t.id === id);
       if (existing) {
         set({ activeTabId: id });
         return id;
       }
-      const tab: Tab = { id, path, kind, title: deriveTitle(path) };
+      const tab: Tab = { id, path, viewMode: "document", title: deriveTitle(path) };
       set({ tabs: [...get().tabs, tab], activeTabId: id });
       return id;
     },
@@ -66,6 +63,12 @@ export function createTabsStore() {
       if (get().tabs.some((t) => t.id === id)) {
         set({ activeTabId: id });
       }
+    },
+
+    setViewMode: (id, mode) => {
+      set((state) => ({
+        tabs: state.tabs.map((t) => (t.id === id ? { ...t, viewMode: mode } : t)),
+      }));
     },
 
     closeAll: () => set({ tabs: [], activeTabId: null }),

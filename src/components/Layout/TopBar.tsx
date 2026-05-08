@@ -1,22 +1,27 @@
 import type { SaveState } from "../../stores/vault";
 import type { ThemeMode } from "../../stores/settings";
+import type { ViewMode } from "../../stores/tabs";
 
 type Props = {
   vaultPath: string | null;
   saveState: SaveState;
   theme: ThemeMode;
+  activeViewMode: ViewMode | null;
   onPickVault: () => void;
   onRefresh: () => void;
   onCycleTheme: () => void;
+  onSetViewMode: (mode: ViewMode) => void;
 };
 
 export function TopBar({
   vaultPath,
   saveState,
   theme,
+  activeViewMode,
   onPickVault,
   onRefresh,
   onCycleTheme,
+  onSetViewMode,
 }: Props) {
   return (
     <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--tippani-border)] px-3 text-sm">
@@ -31,6 +36,35 @@ export function TopBar({
           </span>
         )}
       </div>
+      
+      <div className="flex flex-1 justify-center mx-4">
+        {activeViewMode && (
+          <div className="flex items-center overflow-hidden rounded border border-[var(--tippani-border)] bg-[var(--tippani-bg)] text-xs">
+            <button
+              type="button"
+              onClick={() => onSetViewMode("document")}
+              className={`px-3 py-1 ${activeViewMode === "document" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
+            >
+              Document
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetViewMode("both")}
+              className={`px-3 py-1 border-l border-r border-[var(--tippani-border)] ${activeViewMode === "both" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
+            >
+              Both
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetViewMode("canvas")}
+              className={`px-3 py-1 ${activeViewMode === "canvas" ? "bg-[var(--tippani-accent)] text-[var(--tippani-bg)] font-medium" : "hover:bg-[var(--tippani-hover)]"}`}
+            >
+              Canvas
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="flex shrink-0 items-center gap-2">
         <SaveIndicator state={saveState} hidden={vaultPath === null} />
         <ThemeButton theme={theme} onClick={onCycleTheme} />
