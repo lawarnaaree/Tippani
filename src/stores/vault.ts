@@ -28,6 +28,7 @@ export type VaultStoreState = {
   refresh: () => Promise<void>;
   openNote: (path: string) => Promise<void>;
   updateNoteContent: (content: string) => void;
+  syncNoteContent: (path: string, content: string) => void;
   flushPendingSave: () => Promise<void>;
   clearActive: () => Promise<void>;
   createNote: (path: string) => Promise<void>;
@@ -38,6 +39,10 @@ export function createVaultStore() {
     let pendingTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingPath: string | null = null;
     let pendingContent: string | null = null;
+
+    function isDirty(): boolean {
+      return pendingPath !== null && pendingContent !== null;
+    }
 
     async function performSave() {
       const path = pendingPath;
@@ -137,6 +142,24 @@ export function createVaultStore() {
           pendingTimer = null;
           void performSave();
         }, SAVE_DEBOUNCE_MS);
+      },
+
+      // Apply externally-sourced content to the active note (file watcher path).
+      // Refuses to clobber unsaved local edits or an in-flight save.
+      syncNoteContent: (path, content) => {
+        const state = get();
+        if (state.activeNotePath !== path) return;
+        if (state.saveState === "saving" || isDirty()) {
+          // Local edits are in-flight; preserve them. Logged so dropped external
+          // edits don't disappear silently in dev tools.
+          // eslint-disable-next-line no-console
+          console.info(
+            `[vault] external change to ${path} skipped — local edits pending`,
+          );
+          return;
+        }
+        if (state.noteContent === content) return;
+        set({ noteContent: content });
       },
 
       flushPendingSave: async () => {

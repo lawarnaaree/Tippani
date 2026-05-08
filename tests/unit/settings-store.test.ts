@@ -3,9 +3,21 @@ import {
   createSettingsStore,
   applyTheme,
   resolveDark,
-  loadTheme,
-  persistTheme,
+  loadSettings,
+  persistSettings,
+  type Settings,
 } from "../../src/stores/settings";
+
+const SETTINGS_KEY = "tippani.settings";
+const LEGACY_THEME_KEY = "tippani.theme";
+
+const baseSettings = (): Settings => ({
+  theme: "system",
+  editorFontFamily:
+    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+  editorFontSize: 14,
+  keymap: "default",
+});
 
 type MqlListener = (e: { matches: boolean }) => void;
 
@@ -44,23 +56,40 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("loadTheme / persistTheme", () => {
-  it("defaults to 'system' when nothing is stored", () => {
-    expect(loadTheme()).toBe("system");
+describe("loadSettings / persistSettings", () => {
+  it("defaults to baseline when nothing is stored", () => {
+    const s = loadSettings();
+    expect(s).toEqual(baseSettings());
   });
 
   it("reads back what was persisted", () => {
-    persistTheme("dark");
-    expect(loadTheme()).toBe("dark");
-    persistTheme("light");
-    expect(loadTheme()).toBe("light");
-    persistTheme("system");
-    expect(loadTheme()).toBe("system");
+    persistSettings({ ...baseSettings(), theme: "dark", editorFontSize: 18 });
+    const s = loadSettings();
+    expect(s.theme).toBe("dark");
+    expect(s.editorFontSize).toBe(18);
   });
 
-  it("falls back to 'system' for invalid stored values", () => {
-    window.localStorage.setItem("tippani.theme", "rainbow");
-    expect(loadTheme()).toBe("system");
+  it("falls back to defaults for invalid stored fields", () => {
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ theme: "rainbow", editorFontSize: "huge" }),
+    );
+    const s = loadSettings();
+    expect(s.theme).toBe("system");
+    expect(s.editorFontSize).toBe(14);
+  });
+
+  it("migrates legacy tippani.theme key when no settings stored", () => {
+    window.localStorage.setItem(LEGACY_THEME_KEY, "dark");
+    const s = loadSettings();
+    expect(s.theme).toBe("dark");
+    expect(s.editorFontFamily).toBe(baseSettings().editorFontFamily);
+  });
+
+  it("ignores legacy key when modern settings are present", () => {
+    window.localStorage.setItem(LEGACY_THEME_KEY, "dark");
+    persistSettings({ ...baseSettings(), theme: "light" });
+    expect(loadSettings().theme).toBe("light");
   });
 });
 
@@ -113,7 +142,10 @@ describe("settings store", () => {
     store.getState().setTheme("dark");
 
     expect(store.getState().theme).toBe("dark");
-    expect(window.localStorage.getItem("tippani.theme")).toBe("dark");
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.theme).toBe("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
@@ -130,5 +162,31 @@ describe("settings store", () => {
 
     store.getState().cycleTheme();
     expect(store.getState().theme).toBe("system");
+  });
+
+  it("update mutates a field, persists, and clamps font size", () => {
+    const store = createSettingsStore();
+    store.getState().update("editorFontSize", 18);
+    expect(store.getState().editorFontSize).toBe(18);
+
+    // Above max should clamp to 22.
+    store.getState().update("editorFontSize", 999);
+    expect(store.getState().editorFontSize).toBe(22);
+
+    // Below min should clamp to 10.
+    store.getState().update("editorFontSize", 1);
+    expect(store.getState().editorFontSize).toBe(10);
+
+    const persisted = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!);
+    expect(persisted.editorFontSize).toBe(10);
+  });
+
+  it("update changes editorFontFamily and persists alongside theme", () => {
+    const store = createSettingsStore();
+    store.getState().setTheme("dark");
+    store.getState().update("editorFontFamily", "Foo, monospace");
+    const persisted = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!);
+    expect(persisted.theme).toBe("dark");
+    expect(persisted.editorFontFamily).toBe("Foo, monospace");
   });
 });

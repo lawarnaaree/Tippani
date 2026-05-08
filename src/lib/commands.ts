@@ -68,6 +68,9 @@ export type UseCommandsOpts = {
   onCycleTheme: () => void;
   onCloseTab: () => void;
   onCloseAllTabs: () => void;
+  onOpenSettings: () => void;
+  onExportHtml: () => void;
+  onExportPdf: () => void;
 };
 
 /**
@@ -86,6 +89,9 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
     onCycleTheme,
     onCloseTab,
     onCloseAllTabs,
+    onOpenSettings,
+    onExportHtml,
+    onExportPdf,
   } = opts;
 
   return useMemo(() => {
@@ -147,6 +153,13 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
         section: "actions" as const,
         run: onCloseAllTabs,
       },
+      {
+        id: "action:open-settings",
+        label: "Open settings",
+        keywords: ["settings", "preferences", "config", "options"],
+        section: "actions" as const,
+        run: onOpenSettings,
+      },
     ];
 
     if (activePath) {
@@ -171,7 +184,21 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
           keywords: ["view", "canvas", "draw", "whiteboard", "excalidraw"],
           section: "actions" as const,
           run: () => onSetViewMode("canvas"),
-        }
+        },
+        {
+          id: "action:export-html",
+          label: "Export note as HTML",
+          keywords: ["export", "html", "save", "share"],
+          section: "actions" as const,
+          run: onExportHtml,
+        },
+        {
+          id: "action:export-pdf",
+          label: "Export note as PDF",
+          keywords: ["export", "pdf", "print", "save"],
+          section: "actions" as const,
+          run: onExportPdf,
+        },
       );
     }
 
@@ -187,5 +214,8 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
     onCycleTheme,
     onCloseTab,
     onCloseAllTabs,
+    onOpenSettings,
+    onExportHtml,
+    onExportPdf,
   ]);
 }

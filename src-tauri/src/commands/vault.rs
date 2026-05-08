@@ -28,6 +28,16 @@ struct Config {
     last_vault_path: Option<String>,
 }
 
+fn is_hidden_name(name: &str) -> bool {
+    name.starts_with('.')
+}
+
+fn is_md_path(p: &Path) -> bool {
+    p.extension()
+        .map(|s| s.eq_ignore_ascii_case(NOTE_EXT))
+        .unwrap_or(false)
+}
+
 pub fn list_dir_recursive(root: &Path) -> Result<Vec<VaultEntry>, String> {
     if !root.exists() {
         return Err(format!("Path does not exist: {}", root.display()));
@@ -41,7 +51,7 @@ pub fn list_dir_recursive(root: &Path) -> Result<Vec<VaultEntry>, String> {
         let entry = item.map_err(|e| e.to_string())?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') {
+        if is_hidden_name(&name) {
             continue;
         }
         let metadata = entry.metadata().map_err(|e| e.to_string())?;
@@ -54,11 +64,7 @@ pub fn list_dir_recursive(root: &Path) -> Result<Vec<VaultEntry>, String> {
                 children: Some(children),
             });
         } else if metadata.is_file() {
-            let is_md = path
-                .extension()
-                .map(|s| s.eq_ignore_ascii_case(NOTE_EXT))
-                .unwrap_or(false);
-            if !is_md {
+            if !is_md_path(&path) {
                 continue;
             }
             entries.push(VaultEntry {
@@ -75,6 +81,38 @@ pub fn list_dir_recursive(root: &Path) -> Result<Vec<VaultEntry>, String> {
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
     Ok(entries)
+}
+
+/// Flat walk of a vault root. Skips dotfile dirs/files and returns only `.md` files.
+pub fn walk_md_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    if !root.exists() {
+        return Err(format!("Path does not exist: {}", root.display()));
+    }
+    if !root.is_dir() {
+        return Err(format!("Not a directory: {}", root.display()));
+    }
+    let mut out = Vec::new();
+    walk_md_files_into(root, &mut out)?;
+    Ok(out)
+}
+
+fn walk_md_files_into(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+    let read = fs::read_dir(dir).map_err(|e| e.to_string())?;
+    for item in read {
+        let entry = item.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if is_hidden_name(&name) {
+            continue;
+        }
+        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        if metadata.is_dir() {
+            walk_md_files_into(&path, out)?;
+        } else if metadata.is_file() && is_md_path(&path) {
+            out.push(path);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -141,6 +179,104 @@ pub fn note_rename(from: String, to: String) -> Result<(), String> {
 #[tauri::command]
 pub fn note_delete(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Vault search
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub path: String,
+    pub line: u32,
+    pub preview: String,
+    /// Char offset into `preview` where the match starts.
+    pub match_start: u32,
+    /// Char offset into `preview` where the match ends (exclusive).
+    pub match_end: u32,
+}
+
+const SEARCH_PREVIEW_HALF: usize = 60;
+
+/// Case-insensitive char-by-char substring search. Returns the char index in
+/// `line` where the first match begins.
+///
+/// Operates on chars (not bytes) so it's safe across UTF-8 multi-byte
+/// boundaries. `qlow_chars` must already be lowercased.
+fn find_substring_ci(line_chars: &[char], qlow_chars: &[char]) -> Option<usize> {
+    if qlow_chars.is_empty() || qlow_chars.len() > line_chars.len() {
+        return None;
+    }
+    'outer: for i in 0..=(line_chars.len() - qlow_chars.len()) {
+        for (j, qc) in qlow_chars.iter().enumerate() {
+            let lc = line_chars[i + j]
+                .to_lowercase()
+                .next()
+                .unwrap_or(line_chars[i + j]);
+            if lc != *qc {
+                continue 'outer;
+            }
+        }
+        return Some(i);
+    }
+    None
+}
+
+/// Trim a line to a window of ~2*half chars centered on the match, returning
+/// the preview text and char offsets of the match within it.
+fn make_preview(
+    line_chars: &[char],
+    char_start: usize,
+    query_char_len: usize,
+    half: usize,
+) -> (String, u32, u32) {
+    let total = line_chars.len();
+    let char_end = (char_start + query_char_len).min(total);
+    let start = char_start.saturating_sub(half);
+    let end = (char_end + half).min(total);
+    let text: String = line_chars[start..end].iter().collect();
+    let ms = (char_start - start) as u32;
+    let me = (char_end - start) as u32;
+    (text, ms, me)
+}
+
+#[tauri::command]
+pub fn search_vault(root: String, query: String, limit: u32) -> Result<Vec<SearchHit>, String> {
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let qlow_chars: Vec<char> = query.chars().flat_map(|c| c.to_lowercase()).collect();
+    if qlow_chars.is_empty() {
+        return Ok(Vec::new());
+    }
+    let limit_us = limit.max(1) as usize;
+    let files = walk_md_files(&PathBuf::from(&root))?;
+    let mut hits: Vec<SearchHit> = Vec::with_capacity(64);
+    'outer: for file in files {
+        let content = match fs::read_to_string(&file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        for (i, line) in content.lines().enumerate() {
+            let line_chars: Vec<char> = line.chars().collect();
+            if let Some(cs) = find_substring_ci(&line_chars, &qlow_chars) {
+                let (preview, ms, me) =
+                    make_preview(&line_chars, cs, qlow_chars.len(), SEARCH_PREVIEW_HALF);
+                hits.push(SearchHit {
+                    path: file.to_string_lossy().to_string(),
+                    line: (i as u32) + 1,
+                    preview,
+                    match_start: ms,
+                    match_end: me,
+                });
+                if hits.len() >= limit_us {
+                    break 'outer;
+                }
+            }
+        }
+    }
+    Ok(hits)
 }
 
 fn config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -308,5 +444,110 @@ mod tests {
         let err =
             list_dir_recursive(Path::new("definitely-does-not-exist-tippani-test")).unwrap_err();
         assert!(err.contains("does not exist"));
+    }
+
+    #[test]
+    fn walk_md_files_skips_dotfiles_and_non_md() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        write_at(&root.join("a.md"), "x");
+        write_at(&root.join("notes.txt"), "x");
+        write_at(&root.join(".hidden.md"), "x");
+        write_at(&root.join(".tippani").join("state.json"), "{}");
+        write_at(&root.join("nested").join("b.md"), "x");
+        write_at(&root.join("nested").join(".dot.md"), "x");
+
+        let files = walk_md_files(root).unwrap();
+        let names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec!["a.md", "b.md"]);
+    }
+
+    #[test]
+    fn search_finds_match_in_nested_md() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        write_at(&root.join("a.md"), "alpha\nbeta TODO here\ngamma");
+        write_at(&root.join("nested").join("b.md"), "no match\nanother TODO line\n");
+
+        let hits = search_vault(
+            root.to_string_lossy().to_string(),
+            "todo".to_string(),
+            100,
+        )
+        .unwrap();
+        assert_eq!(hits.len(), 2);
+        let lines: Vec<_> = hits.iter().map(|h| h.line).collect();
+        // a.md matches on line 2; b.md on line 2 — order is FS-dependent so just assert both 2.
+        assert!(lines.iter().all(|l| *l == 2));
+        for h in &hits {
+            let slice = &h.preview[h.match_start as usize..h.match_end as usize];
+            assert_eq!(slice.to_lowercase(), "todo");
+        }
+    }
+
+    #[test]
+    fn search_skips_non_md_and_dotfiles() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        write_at(&root.join("ignored.txt"), "TODO not here");
+        write_at(&root.join(".hidden.md"), "TODO hidden");
+        let hits =
+            search_vault(root.to_string_lossy().to_string(), "todo".to_string(), 100).unwrap();
+        assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn search_respects_limit() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        let lines: Vec<&str> = (0..10).map(|_| "TODO match").collect();
+        write_at(&root.join("a.md"), &lines.join("\n"));
+        let hits =
+            search_vault(root.to_string_lossy().to_string(), "todo".to_string(), 3).unwrap();
+        assert_eq!(hits.len(), 3);
+    }
+
+    #[test]
+    fn search_preview_centers_on_match() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        let prefix = "x".repeat(200);
+        let suffix = "y".repeat(200);
+        let line = format!("{}MATCH{}", prefix, suffix);
+        write_at(&root.join("a.md"), &line);
+        let hits =
+            search_vault(root.to_string_lossy().to_string(), "match".to_string(), 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        let h = &hits[0];
+        // Preview should be roughly 2*60 + 5 chars and should contain MATCH.
+        assert!(h.preview.len() < 200);
+        assert!(h.preview.to_lowercase().contains("match"));
+        let slice = &h.preview[h.match_start as usize..h.match_end as usize];
+        assert_eq!(slice, "MATCH");
+    }
+
+    #[test]
+    fn search_empty_query_returns_empty() {
+        let dir = TempDir::new().unwrap();
+        write_at(&dir.path().join("a.md"), "anything");
+        let hits = search_vault(dir.path().to_string_lossy().to_string(), "".into(), 10).unwrap();
+        assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn search_is_case_insensitive() {
+        let dir = TempDir::new().unwrap();
+        write_at(&dir.path().join("a.md"), "Hello WORLD");
+        let hits =
+            search_vault(dir.path().to_string_lossy().to_string(), "world".into(), 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        let h = &hits[0];
+        let slice = &h.preview[h.match_start as usize..h.match_end as usize];
+        assert_eq!(slice, "WORLD");
     }
 }

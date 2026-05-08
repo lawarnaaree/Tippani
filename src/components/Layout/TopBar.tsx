@@ -7,10 +7,14 @@ type Props = {
   saveState: SaveState;
   theme: ThemeMode;
   activeViewMode: ViewMode | null;
+  hasActiveNote: boolean;
   onPickVault: () => void;
   onRefresh: () => void;
   onCycleTheme: () => void;
   onSetViewMode: (mode: ViewMode) => void;
+  onOpenSettings: () => void;
+  onExportHtml: () => void;
+  onExportPdf: () => void;
 };
 
 export function TopBar({
@@ -18,10 +22,14 @@ export function TopBar({
   saveState,
   theme,
   activeViewMode,
+  hasActiveNote,
   onPickVault,
   onRefresh,
   onCycleTheme,
   onSetViewMode,
+  onOpenSettings,
+  onExportHtml,
+  onExportPdf,
 }: Props) {
   return (
     <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--tippani-border)] px-3 text-sm">
@@ -70,7 +78,21 @@ export function TopBar({
 
       <div className="flex shrink-0 items-center gap-2">
         <SaveIndicator state={saveState} hidden={vaultPath === null} />
+        <ExportMenu
+          disabled={!hasActiveNote}
+          onExportHtml={onExportHtml}
+          onExportPdf={onExportPdf}
+        />
         <ThemeButton theme={theme} onClick={onCycleTheme} />
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          title="Settings"
+          className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)]"
+        >
+          ⚙
+        </button>
         {vaultPath && (
           <button
             type="button"
@@ -88,6 +110,47 @@ export function TopBar({
           {vaultPath ? "Change vault" : "Pick a vault"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function ExportMenu({
+  disabled,
+  onExportHtml,
+  onExportPdf,
+}: {
+  disabled: boolean;
+  onExportHtml: () => void;
+  onExportPdf: () => void;
+}) {
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        disabled={disabled}
+        className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+        title={disabled ? "Open a note to export" : "Export note"}
+      >
+        Export ▾
+      </button>
+      {!disabled && (
+        <div className="absolute right-0 top-full z-20 mt-1 hidden min-w-[140px] flex-col rounded border border-[var(--tippani-border)] bg-[var(--tippani-bg)] py-1 text-xs shadow-md group-hover:flex group-focus-within:flex">
+          <button
+            type="button"
+            onClick={onExportHtml}
+            className="px-3 py-1.5 text-left hover:bg-[var(--tippani-hover)]"
+          >
+            HTML
+          </button>
+          <button
+            type="button"
+            onClick={onExportPdf}
+            className="px-3 py-1.5 text-left hover:bg-[var(--tippani-hover)]"
+          >
+            PDF
+          </button>
+        </div>
+      )}
     </div>
   );
 }
