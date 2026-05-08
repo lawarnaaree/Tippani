@@ -4,6 +4,8 @@ import {
   FONT_SIZE_MIN,
   useSettings,
 } from "../../stores/settings";
+import { check } from "@tauri-apps/plugin-updater";
+import { useState } from "react";
 
 const FONT_FAMILY_OPTIONS: { label: string; value: string }[] = [
   {
@@ -43,6 +45,28 @@ export function SettingsModal({ open, onClose, vaultPath, onChangeVault }: Props
   const editorFontSize = useSettings((s) => s.editorFontSize);
   const keymap = useSettings((s) => s.keymap);
   const update = useSettings((s) => s.update);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatus(null);
+    try {
+      const update = await check();
+      if (update) {
+        setUpdateStatus(`Update available: v${update.version}`);
+        // For simplicity in this UI, we just notify. 
+        // In a real app, you'd show a "Download & Install" button.
+      } else {
+        setUpdateStatus("No updates available.");
+      }
+    } catch (e) {
+      console.error(e);
+      setUpdateStatus("Error checking for updates.");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -161,6 +185,27 @@ export function SettingsModal({ open, onClose, vaultPath, onChangeVault }: Props
               </option>
             </select>
           </Row>
+        </Section>
+
+        <Section title="App">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--tippani-muted)]">Version 0.1.0</span>
+              <button
+                type="button"
+                onClick={handleCheckForUpdates}
+                disabled={checkingUpdate}
+                className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)] disabled:opacity-50"
+              >
+                {checkingUpdate ? "Checking…" : "Check for updates"}
+              </button>
+            </div>
+            {updateStatus && (
+              <div className="text-[10px] text-[var(--tippani-muted)] mt-1">
+                {updateStatus}
+              </div>
+            )}
+          </div>
         </Section>
       </div>
     </div>

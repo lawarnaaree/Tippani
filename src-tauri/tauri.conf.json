@@ -21,6 +21,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Lawarna/Tippani/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFEMURCMkYzN0Y1RUM4QUYKUldTdnlGNS84N0lkSFROUkJ1VHdHbXdFbGlLaU9RdGNzL0tuRktKTTllM0Y0OEhGZWlnQlNTaGEK"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
