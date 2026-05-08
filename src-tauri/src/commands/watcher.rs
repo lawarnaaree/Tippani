@@ -109,10 +109,10 @@ fn process_events(events: Vec<Event>, app: &AppHandle) {
                 EventKind::Modify(ModifyKind::Name(_)) => {
                     tree_paths.insert(path);
                 }
-                EventKind::Modify(ModifyKind::Data(_)) | EventKind::Modify(ModifyKind::Any) => {
-                    if is_md_path(&path) {
-                        updated_md.insert(path);
-                    }
+                EventKind::Modify(ModifyKind::Data(_)) | EventKind::Modify(ModifyKind::Any)
+                    if is_md_path(&path) =>
+                {
+                    updated_md.insert(path);
                 }
                 _ => {}
             }
