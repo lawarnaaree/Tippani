@@ -472,14 +472,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let root = dir.path();
         write_at(&root.join("a.md"), "alpha\nbeta TODO here\ngamma");
-        write_at(&root.join("nested").join("b.md"), "no match\nanother TODO line\n");
+        write_at(
+            &root.join("nested").join("b.md"),
+            "no match\nanother TODO line\n",
+        );
 
-        let hits = search_vault(
-            root.to_string_lossy().to_string(),
-            "todo".to_string(),
-            100,
-        )
-        .unwrap();
+        let hits =
+            search_vault(root.to_string_lossy().to_string(), "todo".to_string(), 100).unwrap();
         assert_eq!(hits.len(), 2);
         let lines: Vec<_> = hits.iter().map(|h| h.line).collect();
         // a.md matches on line 2; b.md on line 2 — order is FS-dependent so just assert both 2.
@@ -507,8 +506,7 @@ mod tests {
         let root = dir.path();
         let lines: Vec<&str> = (0..10).map(|_| "TODO match").collect();
         write_at(&root.join("a.md"), &lines.join("\n"));
-        let hits =
-            search_vault(root.to_string_lossy().to_string(), "todo".to_string(), 3).unwrap();
+        let hits = search_vault(root.to_string_lossy().to_string(), "todo".to_string(), 3).unwrap();
         assert_eq!(hits.len(), 3);
     }
 
