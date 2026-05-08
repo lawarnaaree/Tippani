@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --tippani-bg: #ffffff;
+  --tippani-fg: #0f0f0f;
+  --tippani-muted: #6b7280;
+  --tippani-border: #e5e7eb;
+  --tippani-accent: #111827;
+  --tippani-sidebar: #fafafa;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tippani-bg: #1a1a1a;
+    --tippani-fg: #e5e7eb;
+    --tippani-muted: #9ca3af;
+    --tippani-border: #2a2a2a;
+    --tippani-accent: #f3f4f6;
+    --tippani-sidebar: #141414;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 14px;
+  background-color: var(--tippani-bg);
+  color: var(--tippani-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+}
