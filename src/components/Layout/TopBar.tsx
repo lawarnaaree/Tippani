@@ -13,9 +13,22 @@ type Props = {
   onCycleTheme: () => void;
   onSetViewMode: (mode: ViewMode) => void;
   onOpenSettings: () => void;
+  onOpenSymbols: () => void;
+  onApplyColor: (color: string) => void;
   onExportHtml: () => void;
   onExportPdf: () => void;
 };
+
+const COLOR_BUTTON_OPTIONS: { name: string; cls: string }[] = [
+  { name: "red", cls: "tippani-color-red" },
+  { name: "orange", cls: "tippani-color-orange" },
+  { name: "yellow", cls: "tippani-color-yellow" },
+  { name: "green", cls: "tippani-color-green" },
+  { name: "blue", cls: "tippani-color-blue" },
+  { name: "purple", cls: "tippani-color-purple" },
+  { name: "pink", cls: "tippani-color-pink" },
+  { name: "gray", cls: "tippani-color-gray" },
+];
 
 export function TopBar({
   vaultPath,
@@ -28,6 +41,8 @@ export function TopBar({
   onCycleTheme,
   onSetViewMode,
   onOpenSettings,
+  onOpenSymbols,
+  onApplyColor,
   onExportHtml,
   onExportPdf,
 }: Props) {
@@ -78,6 +93,8 @@ export function TopBar({
 
       <div className="flex shrink-0 items-center gap-2">
         <SaveIndicator state={saveState} hidden={vaultPath === null} />
+        <SymbolButton onClick={onOpenSymbols} />
+        <ColorButton onApply={onApplyColor} />
         <ExportMenu
           disabled={!hasActiveNote}
           onExportHtml={onExportHtml}
@@ -181,6 +198,78 @@ function SaveIndicator({
     <span aria-live="polite" className={`text-xs ${color}`}>
       {label}
     </span>
+  );
+}
+
+function SymbolButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Insert symbol (Ctrl/Cmd+Shift+S)"
+      aria-label="Insert symbol"
+      className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)]"
+      style={{ fontFamily: "serif", fontStyle: "italic" }}
+    >
+      π
+    </button>
+  );
+}
+
+function ColorButton({ onApply }: { onApply: (color: string) => void }) {
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        title="Color text — wraps the current selection"
+        aria-label="Color text"
+        className="rounded border border-[var(--tippani-border)] px-2 py-1 text-xs hover:bg-[var(--tippani-hover)]"
+      >
+        <span style={{ fontWeight: 600 }}>A</span>
+        <span aria-hidden style={{ marginLeft: 2 }}>▾</span>
+      </button>
+      <div className="absolute right-0 top-full z-20 mt-1 hidden w-44 flex-col rounded border border-[var(--tippani-border)] bg-[var(--tippani-bg)] py-1 text-xs shadow-md group-hover:flex group-focus-within:flex">
+        {COLOR_BUTTON_OPTIONS.map((c) => (
+          <button
+            key={c.name}
+            type="button"
+            onClick={() => onApply(c.name)}
+            className={`flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--tippani-hover)] ${c.cls}`}
+          >
+            <span
+              aria-hidden
+              className={c.cls}
+              style={{
+                display: "inline-block",
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                background: "currentColor",
+              }}
+            />
+            <span style={{ color: "var(--tippani-fg)" }}>{c.name}</span>
+          </button>
+        ))}
+        <label className="flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--tippani-hover)]">
+          <span
+            aria-hidden
+            style={{
+              display: "inline-block",
+              width: 10,
+              height: 10,
+              borderRadius: 2,
+              border: "1px solid var(--tippani-border)",
+            }}
+          />
+          <span>Custom…</span>
+          <input
+            type="color"
+            onChange={(e) => onApply(e.target.value)}
+            className="ml-auto h-5 w-6 cursor-pointer border-0 bg-transparent p-0"
+          />
+        </label>
+      </div>
+    </div>
   );
 }
 

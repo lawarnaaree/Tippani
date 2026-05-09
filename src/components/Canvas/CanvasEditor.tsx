@@ -3,6 +3,8 @@ import { Excalidraw, Footer, useDevice } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
 import { noteRead, noteWrite } from "../../lib/tauri";
+import { tryAutoreplace } from "../../lib/symbols";
+import { StrokePanel } from "./StrokePanel";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import "highlight.js/styles/github.css";
@@ -10,6 +12,7 @@ import "highlight.js/styles/github.css";
 type Props = {
   path: string;
   onOpenMenu?: () => void;
+  onOpenSymbols?: () => void;
 };
 
 type CodeBlock = {
@@ -19,7 +22,7 @@ type CodeBlock = {
   highlighted: string;
 };
 
-export default function CanvasEditor({ path, onOpenMenu }: Props) {
+export default function CanvasEditor({ path, onOpenMenu, onOpenSymbols }: Props) {
   const [initialData, setInitialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [api, setApi] = useState<any>(null);
@@ -66,6 +69,50 @@ export default function CanvasEditor({ path, onOpenMenu }: Props) {
       active = false;
     };
   }, [canvasPath]);
+
+  // LaTeX-style autoreplace inside Excalidraw's text-edit overlay.
+  //
+  // Excalidraw mounts a single <textarea data-type="wysiwyg"> when the user
+  // enters text-edit mode and reads `.value` directly in its own oninput
+  // handler — so a capture-phase document listener can mutate the textarea's
+  // value before Excalidraw reads it, with no React-control gymnastics. This
+  // mirrors the CodeMirror plugin in MarkdownEditor.tsx via the shared
+  // tryAutoreplace helper in src/lib/symbols.ts.
+  useEffect(() => {
+    function onInput(e: Event) {
+      if (!(e instanceof InputEvent)) return;
+      if (!e.isTrusted || e.isComposing) return;
+      const target = e.target;
+      if (!(target instanceof HTMLTextAreaElement)) return;
+      if (target.dataset.type !== "wysiwyg") return;
+
+      const trigger = e.data;
+      if (!trigger || trigger.length > 2) return;
+
+      const cursor = target.selectionStart ?? target.value.length;
+      const triggerStart = cursor - trigger.length;
+      if (triggerStart < 1) return;
+
+      const prefix = target.value.slice(
+        Math.max(0, triggerStart - 32),
+        triggerStart,
+      );
+      const match = tryAutoreplace(prefix, trigger);
+      if (!match) return;
+
+      const tokenStart = triggerStart - match.tokenLength;
+      const newValue =
+        target.value.slice(0, tokenStart) +
+        match.glyph +
+        target.value.slice(triggerStart);
+      target.value = newValue;
+      const newCursor = tokenStart + match.glyph.length + trigger.length;
+      target.setSelectionRange(newCursor, newCursor);
+    }
+
+    document.addEventListener("input", onInput, true);
+    return () => document.removeEventListener("input", onInput, true);
+  }, []);
 
   const handleChange = useCallback(
     (elements: readonly any[], appState: any, files: any) => {
@@ -201,6 +248,7 @@ export default function CanvasEditor({ path, onOpenMenu }: Props) {
       ref={containerRef}
       className="relative flex-1 overflow-hidden min-h-0 min-w-0 h-full w-full excalidraw-eraser-theme"
     >
+      <StrokePanel api={api} />
       <Excalidraw
         excalidrawAPI={(apiRef: any) => setApi(apiRef)}
         theme={theme}
@@ -225,6 +273,7 @@ export default function CanvasEditor({ path, onOpenMenu }: Props) {
           api={api}
           visible={hasSelection}
           onMenu={onOpenMenu}
+          onSymbols={onOpenSymbols}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onUndo={handleUndo}
@@ -246,6 +295,7 @@ function DesktopActionsFooter({
   api,
   visible,
   onMenu,
+  onSymbols,
   onDuplicate,
   onDelete,
   onUndo,
@@ -254,6 +304,7 @@ function DesktopActionsFooter({
   api: any;
   visible: boolean;
   onMenu?: () => void;
+  onSymbols?: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onUndo: () => void;
@@ -280,6 +331,17 @@ function DesktopActionsFooter({
         >
           <MenuIcon />
         </button>
+
+        {onSymbols && (
+          <button
+            type="button"
+            onClick={() => onSymbols()}
+            aria-label="Symbols"
+            title="Insert symbol (Ctrl+Shift+S)"
+          >
+            <SymbolIcon />
+          </button>
+        )}
 
         <div className="tippani-canvas-actions-divider" />
         <button
@@ -434,6 +496,23 @@ function SelectionIcon() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
+  );
+}
+
+function SymbolIcon() {
+  // Greek lowercase pi — small enough to render as a button glyph.
+  return (
+    <span
+      aria-hidden
+      style={{
+        fontSize: 18,
+        lineHeight: 1,
+        fontStyle: "italic",
+        fontFamily: "serif",
+      }}
+    >
+      π
+    </span>
   );
 }
 

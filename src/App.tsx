@@ -21,8 +21,10 @@ import { TabBar } from "./components/Layout/TabBar";
 import { Palette } from "./components/CommandPalette/Palette";
 import { PreviewPane } from "./components/Editor/PreviewPane";
 import { SettingsModal } from "./components/Settings/SettingsModal";
+import { SymbolPalette } from "./components/SymbolPalette/SymbolPalette";
 import { exportHtml, exportPdf } from "./lib/export";
 import { noteStem } from "./lib/markdown";
+import { insertAtCursor, wrapSelection } from "./stores/activeEditor";
 
 const CanvasEditor = lazy(() => import("./components/Canvas/CanvasEditor"));
 
@@ -69,6 +71,49 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarCreating, setSidebarCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [symbolPaletteOpen, setSymbolPaletteOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string, ms = 2200) => {
+    setToast(msg);
+    window.setTimeout(() => {
+      setToast((cur) => (cur === msg ? null : cur));
+    }, ms);
+  }, []);
+
+  const handleInsertSymbol = useCallback(
+    (char: string) => {
+      // Document/Both: route to the active CodeMirror editor.
+      if (activeViewMode !== "canvas") {
+        const ok = insertAtCursor(char);
+        if (ok) return;
+      }
+      // Canvas (or no editor focused): copy to clipboard. Excalidraw's text
+      // overlay accepts paste, so this is a one-keystroke completion.
+      void navigator.clipboard
+        .writeText(char)
+        .then(() =>
+          showToast(
+            activeViewMode === "canvas"
+              ? `${char} copied — paste with Ctrl+V into a text element.`
+              : `${char} copied to clipboard.`,
+          ),
+        )
+        .catch(() => showToast("Could not copy symbol to clipboard."));
+    },
+    [activeViewMode, showToast],
+  );
+
+  const handleApplyColor = useCallback(
+    (color: string) => {
+      // Color is either a named token (red, blue, …) or a hex string.
+      const ok = wrapSelection(`==${color}:`, `==`);
+      if (!ok) {
+        showToast("Open a markdown editor to apply a color.");
+      }
+    },
+    [showToast],
+  );
 
   // Bootstrap vault on mount
   useEffect(() => {
@@ -190,11 +235,12 @@ export default function App() {
     onExportPdf: handleExportPdf,
   });
 
-  // Global keyboard shortcuts (⌘K, ⌘P, ⌘N, ⌘Shift+L)
+  // Global keyboard shortcuts (⌘K, ⌘P, ⌘N, ⌘Shift+L, ⌘Shift+S)
   useGlobalShortcuts({
     onTogglePalette: useCallback(() => setPaletteOpen((v) => !v), []),
     onCycleTheme: cycleTheme,
     onNewNote: handleNewNote,
+    onToggleSymbols: useCallback(() => setSymbolPaletteOpen((v) => !v), []),
   });
 
   return (
@@ -214,6 +260,8 @@ export default function App() {
               if (activePath) setViewMode(activePath, mode);
             }}
             onOpenSettings={handleOpenSettings}
+            onOpenSymbols={() => setSymbolPaletteOpen(true)}
+            onApplyColor={handleApplyColor}
             onExportHtml={handleExportHtml}
             onExportPdf={handleExportPdf}
           />
@@ -266,7 +314,11 @@ export default function App() {
             </Group>
           ) : activeViewMode === "canvas" ? (
             <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">Loading Excalidraw...</div>}>
-              <CanvasEditor path={activePath} onOpenMenu={() => setPaletteOpen(true)} />
+              <CanvasEditor
+                path={activePath}
+                onOpenMenu={() => setPaletteOpen(true)}
+                onOpenSymbols={() => setSymbolPaletteOpen(true)}
+              />
             </Suspense>
           ) : (
             <MarkdownEditor value={noteContent} onChange={updateNoteContent} />
@@ -284,8 +336,26 @@ export default function App() {
         vaultPath={vaultPath}
         onChangeVault={() => void pickAndOpen()}
       />
+      <SymbolPalette
+        open={symbolPaletteOpen}
+        onClose={() => setSymbolPaletteOpen(false)}
+        onInsert={handleInsertSymbol}
+      />
+      {toast && <Toast text={toast} />}
       {error && <ErrorBanner text={error} />}
     </>
+  );
+}
+
+function Toast({ text }: { text: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded border border-[var(--tippani-border)] bg-[var(--tippani-bg)] px-3 py-2 text-xs shadow-md"
+    >
+      {text}
+    </div>
   );
 }
 

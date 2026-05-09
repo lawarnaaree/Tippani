@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   splitMarkdown,
   renderMarkdownHtml,
+  applyColorShorthand,
   noteStem,
   hasMermaid,
 } from "../../src/lib/markdown";
@@ -77,6 +78,58 @@ describe("renderMarkdownHtml", () => {
   it("strips javascript: URLs", () => {
     const html = renderMarkdownHtml("[click](javascript:alert(1))");
     expect(html.toLowerCase()).not.toContain("javascript:");
+  });
+});
+
+describe("applyColorShorthand", () => {
+  it("converts named-color shorthand to a class span", () => {
+    expect(applyColorShorthand("==red:hello==")).toBe(
+      '<span class="tippani-color-red">hello</span>',
+    );
+  });
+
+  it("normalises grey to gray for class consistency", () => {
+    expect(applyColorShorthand("==grey:bar==")).toBe(
+      '<span class="tippani-color-gray">bar</span>',
+    );
+  });
+
+  it("converts hex shorthand to an inline style", () => {
+    expect(applyColorShorthand("==#3b82f6:hi==")).toBe(
+      '<span style="color:#3b82f6">hi</span>',
+    );
+  });
+
+  it("rejects unknown named colors and leaves them intact", () => {
+    expect(applyColorShorthand("==puce:foo==")).toBe("==puce:foo==");
+  });
+
+  it("rejects malformed hex and leaves the source intact", () => {
+    expect(applyColorShorthand("==#zz:nope==")).toBe("==#zz:nope==");
+  });
+
+  it("does not span across newlines", () => {
+    const src = "==red:line1\nline2==";
+    expect(applyColorShorthand(src)).toBe(src);
+  });
+
+  it("handles multiple shorthands on one line", () => {
+    expect(applyColorShorthand("==red:a== and ==blue:b==")).toBe(
+      '<span class="tippani-color-red">a</span> and <span class="tippani-color-blue">b</span>',
+    );
+  });
+});
+
+describe("renderMarkdownHtml — color shorthand", () => {
+  it("preserves named-color spans through DOMPurify", () => {
+    const html = renderMarkdownHtml("Hello ==red:world==!");
+    expect(html).toMatch(/class="tippani-color-red"/);
+    expect(html).toMatch(/world/);
+  });
+
+  it("preserves hex inline-style spans through DOMPurify", () => {
+    const html = renderMarkdownHtml("==#3b82f6:blue==");
+    expect(html).toMatch(/color\s*:\s*#3b82f6/i);
   });
 });
 

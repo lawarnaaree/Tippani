@@ -21,6 +21,17 @@ html, body {
   --tippani-hover: rgba(0, 0, 0, 0.04);
   --tippani-active: rgba(0, 0, 0, 0.08);
   --tippani-tab-active: #ffffff;
+
+  /* Named colors for the ==color:text== shorthand. Light-theme tones tuned
+     for legibility on white backgrounds. */
+  --tippani-color-red: #dc2626;
+  --tippani-color-blue: #2563eb;
+  --tippani-color-green: #15803d;
+  --tippani-color-yellow: #b45309;
+  --tippani-color-purple: #7c3aed;
+  --tippani-color-orange: #ea580c;
+  --tippani-color-pink: #db2777;
+  --tippani-color-gray: #6b7280;
 }
 
 .dark {
@@ -35,7 +46,26 @@ html, body {
   --tippani-hover: rgba(212, 184, 138, 0.06);
   --tippani-active: rgba(212, 184, 138, 0.12);
   --tippani-tab-active: #0d0a06;
+
+  /* Brighter on dark to keep contrast above 4.5:1 against true black. */
+  --tippani-color-red: #f87171;
+  --tippani-color-blue: #60a5fa;
+  --tippani-color-green: #4ade80;
+  --tippani-color-yellow: #fbbf24;
+  --tippani-color-purple: #c084fc;
+  --tippani-color-orange: #fb923c;
+  --tippani-color-pink: #f472b6;
+  --tippani-color-gray: #9ca3af;
 }
+
+.tippani-color-red { color: var(--tippani-color-red); }
+.tippani-color-blue { color: var(--tippani-color-blue); }
+.tippani-color-green { color: var(--tippani-color-green); }
+.tippani-color-yellow { color: var(--tippani-color-yellow); }
+.tippani-color-purple { color: var(--tippani-color-purple); }
+.tippani-color-orange { color: var(--tippani-color-orange); }
+.tippani-color-pink { color: var(--tippani-color-pink); }
+.tippani-color-gray { color: var(--tippani-color-gray); }
 
 html,
 body,
@@ -1019,4 +1049,75 @@ button {
 .excalidraw-eraser-theme .layer-ui__wrapper__top-right,
 .excalidraw-eraser-theme .ToolIcon__keybinding {
   display: none !important;
+}
+
+/* ───── Tippani stroke panel (canvas: width slider + color swatches) ───── */
+.tippani-stroke-panel {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--tippani-bg);
+  color: var(--tippani-fg);
+  border: 1px solid var(--tippani-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  pointer-events: auto;
+}
+.dark .tippani-stroke-panel {
+  box-shadow: 0 0 0 1px var(--tippani-border), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.tippani-stroke-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tippani-stroke-label {
+  min-width: 44px;
+  color: var(--tippani-muted);
+  font-weight: 500;
+}
+.tippani-stroke-row input[type="range"] {
+  width: 160px;
+}
+.tippani-stroke-value {
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tippani-stroke-swatches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tippani-stroke-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--tippani-border);
+  cursor: pointer;
+  padding: 0;
+}
+.tippani-stroke-swatch:hover {
+  outline: 2px solid var(--tippani-accent);
+  outline-offset: 1px;
+}
+.tippani-stroke-swatch-active {
+  outline: 2px solid var(--tippani-accent);
+  outline-offset: 1px;
+}
+.tippani-stroke-custom {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--tippani-border);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
 }

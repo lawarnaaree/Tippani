@@ -42,9 +42,63 @@ export function splitMarkdown(src: string): MdSegment[] {
 
 marked.setOptions({ gfm: true, breaks: false });
 
+// Inline color shorthand: ==red:text== or ==#3b82f6:text==
+// Named colors compile to a CSS class (theme-aware via :root tokens); arbitrary
+// hex compiles to an inline style. Both are escaped before injection.
+export const NAMED_COLORS = new Set([
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "orange",
+  "pink",
+  "gray",
+  "grey",
+]);
+
+const COLOR_SHORTHAND =
+  /==(?:([a-zA-Z]+)|(#[0-9a-fA-F]{3,8})):([^=\n]+)==/g;
+
+function isSafeHexColor(hex: string): boolean {
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
+    hex,
+  );
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      case "'": return "&#39;";
+      default: return c;
+    }
+  });
+}
+
+export function applyColorShorthand(src: string): string {
+  return src.replace(COLOR_SHORTHAND, (full, named, hex, text) => {
+    if (named) {
+      const key = (named as string).toLowerCase();
+      if (!NAMED_COLORS.has(key)) return full;
+      // "grey" is an alias for "gray" — normalise for consistent CSS.
+      const cls = key === "grey" ? "gray" : key;
+      return `<span class="tippani-color-${cls}">${text}</span>`;
+    }
+    if (hex && isSafeHexColor(hex)) {
+      return `<span style="color:${escapeAttr(hex)}">${text}</span>`;
+    }
+    return full;
+  });
+}
+
 export function renderMarkdownHtml(md: string): string {
-  const html = marked.parse(md, { async: false }) as string;
-  return DOMPurify.sanitize(html);
+  const preprocessed = applyColorShorthand(md);
+  const html = marked.parse(preprocessed, { async: false }) as string;
+  return DOMPurify.sanitize(html, { ADD_ATTR: ["style"] });
 }
 
 export function noteStem(path: string | null): string {

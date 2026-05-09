@@ -4,6 +4,7 @@ export type GlobalShortcutHandlers = {
   onTogglePalette: () => void;
   onCycleTheme: () => void;
   onNewNote: () => void;
+  onToggleSymbols: () => void;
 };
 
 /**
@@ -12,17 +13,19 @@ export type GlobalShortcutHandlers = {
  * Listens on `window` in the **capture** phase so shortcuts fire before
  * CodeMirror or other focused elements consume the event.
  *
- * | Shortcut              | Action               |
- * |-----------------------|----------------------|
- * | Ctrl/Cmd + K          | Toggle palette       |
- * | Ctrl/Cmd + P          | Toggle palette alias |
- * | Ctrl/Cmd + Shift + L  | Cycle theme          |
- * | Ctrl/Cmd + N          | New note             |
+ * | Shortcut              | Action                |
+ * |-----------------------|-----------------------|
+ * | Ctrl/Cmd + K          | Toggle palette        |
+ * | Ctrl/Cmd + P          | Toggle palette alias  |
+ * | Ctrl/Cmd + Shift + L  | Cycle theme           |
+ * | Ctrl/Cmd + N          | New note              |
+ * | Ctrl/Cmd + Shift + S  | Toggle symbol palette |
  */
 export function useGlobalShortcuts({
   onTogglePalette,
   onCycleTheme,
   onNewNote,
+  onToggleSymbols,
 }: GlobalShortcutHandlers): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -51,10 +54,17 @@ export function useGlobalShortcuts({
         onNewNote();
         return;
       }
+
+      // Ctrl/Cmd + Shift + S  →  toggle symbol palette
+      if (key === "s" && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        onToggleSymbols();
+        return;
+      }
     };
 
     // capture phase → fires before CodeMirror's keydown handlers
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
-  }, [onTogglePalette, onCycleTheme, onNewNote]);
+  }, [onTogglePalette, onCycleTheme, onNewNote, onToggleSymbols]);
 }
