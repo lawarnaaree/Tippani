@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Excalidraw, Footer, useDevice } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
-import { invoke } from "@tauri-apps/api/core";
+import { noteRead, noteWrite } from "../../lib/tauri";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import "highlight.js/styles/github.css";
@@ -35,7 +35,7 @@ export default function CanvasEditor({ path, onOpenMenu }: Props) {
 
   useEffect(() => {
     let active = true;
-    invoke<string>("note_read", { path: canvasPath })
+    noteRead(canvasPath)
       .then((content) => {
         if (!active) return;
         if (content.trim()) {
@@ -120,9 +120,7 @@ export default function CanvasEditor({ path, onOpenMenu }: Props) {
       clearTimeout(saveTimeout.current);
       saveTimeout.current = setTimeout(() => {
         const data = JSON.stringify({ elements, files });
-        invoke("note_write", { path: canvasPath, content: data }).catch(
-          console.error,
-        );
+        noteWrite(canvasPath, data).catch(console.error);
       }, 1000);
     },
     [canvasPath, api],

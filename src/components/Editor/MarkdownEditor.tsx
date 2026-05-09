@@ -37,6 +37,7 @@ export function MarkdownEditor({ value, onChange }: Props) {
   const extensions = useMemo(
     () => [
       markdown({ codeLanguages: languages }),
+      EditorView.lineWrapping,
       fontCompartment.of(fontTheme(fontFamily, fontSize)),
     ],
     // Initial extensions only — subsequent font changes go through dispatch.

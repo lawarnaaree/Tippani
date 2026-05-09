@@ -36,6 +36,8 @@ export default function App() {
   const error = useVault((s) => s.error);
   const bootstrap = useVault((s) => s.bootstrap);
   const pickAndOpen = useVault((s) => s.pickAndOpen);
+  const reconnect = useVault((s) => s.reconnect);
+  const pendingReconnect = useVault((s) => s.pendingReconnect);
   const refresh = useVault((s) => s.refresh);
   const openNote = useVault((s) => s.openNote);
   const updateNoteContent = useVault((s) => s.updateNoteContent);
@@ -237,7 +239,11 @@ export default function App() {
         }
         main={
           vaultPath === null ? (
-            <EmptyState onPick={() => void pickAndOpen()} />
+            <EmptyState
+              onPick={() => void pickAndOpen()}
+              reconnectName={pendingReconnect}
+              onReconnect={() => void reconnect()}
+            />
           ) : activePath === null ? (
             <NoNoteSelected />
           ) : activeViewMode === "both" ? (
@@ -283,7 +289,15 @@ export default function App() {
   );
 }
 
-function EmptyState({ onPick }: { onPick: () => void }) {
+function EmptyState({
+  onPick,
+  reconnectName,
+  onReconnect,
+}: {
+  onPick: () => void;
+  reconnectName: string | null;
+  onReconnect: () => void;
+}) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
       <h2 className="text-lg font-medium">Welcome to Tippani</h2>
@@ -291,6 +305,15 @@ function EmptyState({ onPick }: { onPick: () => void }) {
         Pick a folder on your machine to use as a vault. Tippani stores notes
         as plain <code>.md</code> files — no lock-in.
       </p>
+      {reconnectName && (
+        <button
+          type="button"
+          onClick={onReconnect}
+          className="rounded border border-[var(--tippani-border)] bg-[var(--tippani-hover)] px-3 py-1.5 text-sm hover:opacity-90"
+        >
+          Reconnect to "{reconnectName}"
+        </button>
+      )}
       <button
         type="button"
         onClick={onPick}

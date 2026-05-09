@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import mermaid from "mermaid";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
-import { noteWriteBytes, noteWrite, pickSavePath } from "../../lib/tauri";
+import { saveBytesToUserFile, saveTextToUserFile } from "../../lib/tauri";
 
 type Props = {
   code: string;
@@ -93,13 +93,14 @@ export function MermaidBlock({ code, noteStem, blockIndex }: Props) {
     const svgEl = containerRef.current?.querySelector("svg");
     if (!svgEl) return;
     const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgEl.outerHTML;
-    const targetPath = await pickSavePath({
-      defaultPath: `${noteStem}-diagram-${blockIndex + 1}.svg`,
-      filters: [{ name: "SVG", extensions: ["svg"] }],
-    });
-    if (!targetPath) return;
     try {
-      await noteWrite(targetPath, xml);
+      await saveTextToUserFile(
+        {
+          defaultPath: `${noteStem}-diagram-${blockIndex + 1}.svg`,
+          filters: [{ name: "SVG", extensions: ["svg"] }],
+        },
+        xml,
+      );
     } catch (e) {
       console.error("SVG export failed", e);
     }
@@ -152,13 +153,14 @@ export function MermaidBlock({ code, noteStem, blockIndex }: Props) {
 
     const dataUrl = canvas.toDataURL("image/png");
     const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-    const targetPath = await pickSavePath({
-      defaultPath: `${noteStem}-diagram-${blockIndex + 1}.png`,
-      filters: [{ name: "PNG", extensions: ["png"] }],
-    });
-    if (!targetPath) return;
     try {
-      await noteWriteBytes(targetPath, base64);
+      await saveBytesToUserFile(
+        {
+          defaultPath: `${noteStem}-diagram-${blockIndex + 1}.png`,
+          filters: [{ name: "PNG", extensions: ["png"] }],
+        },
+        base64,
+      );
     } catch (e) {
       console.error("PNG export failed", e);
     }

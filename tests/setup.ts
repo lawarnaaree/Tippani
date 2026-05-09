@@ -2,6 +2,17 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 
+// The platform layer at src/lib/platform/index.ts picks the Tauri backend
+// when window.__TAURI_INTERNALS__ exists, otherwise the web (File System
+// Access API) backend. Our existing unit tests mock @tauri-apps/* modules
+// and exercise the Tauri code path, so we mark the test environment as
+// "Tauri-like" here. Individual tests can still override by deleting the
+// property before importing the module under test.
+if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) {
+  (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ =
+    {};
+}
+
 // cmdk (via radix) requires ResizeObserver, which jsdom does not implement.
 if (typeof window !== "undefined" && !window.ResizeObserver) {
   window.ResizeObserver = class ResizeObserver {

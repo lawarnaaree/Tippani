@@ -1,5 +1,5 @@
 import { renderMarkdownHtml } from "./markdown";
-import { noteWrite, pickSavePath } from "./tauri";
+import { saveTextToUserFile } from "./tauri";
 
 const BASE_CSS = `
   body {
@@ -59,14 +59,15 @@ ${bodyHtml}
 }
 
 export async function exportHtml(title: string, markdown: string): Promise<void> {
-  const path = await pickSavePath({
-    defaultPath: `${title}.html`,
-    filters: [{ name: "HTML", extensions: ["html"] }],
-  });
-  if (!path) return;
   const body = renderMarkdownHtml(markdown);
   const shell = makeShell(title, body);
-  await noteWrite(path, shell);
+  await saveTextToUserFile(
+    {
+      defaultPath: `${title}.html`,
+      filters: [{ name: "HTML", extensions: ["html"] }],
+    },
+    shell,
+  );
 }
 
 export function exportPdf(title: string, markdown: string): void {

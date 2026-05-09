@@ -8,6 +8,8 @@ import {
   noteRead,
   noteWrite,
   noteCreate,
+  pendingReconnectName,
+  reconnectStoredVault,
 } from "../lib/tauri";
 
 export const SAVE_DEBOUNCE_MS = 400;
@@ -22,9 +24,13 @@ export type VaultStoreState = {
   loading: boolean;
   saveState: SaveState;
   error: string | null;
+  // Web-only: name of a previously-opened vault whose stored handle needs a
+  // permission re-grant before it can be used again. Always null on desktop.
+  pendingReconnect: string | null;
 
   bootstrap: () => Promise<void>;
   pickAndOpen: () => Promise<void>;
+  reconnect: () => Promise<void>;
   refresh: () => Promise<void>;
   openNote: (path: string) => Promise<void>;
   updateNoteContent: (content: string) => void;
@@ -69,14 +75,20 @@ export function createVaultStore() {
       loading: false,
       saveState: "idle",
       error: null,
+      pendingReconnect: null,
 
       bootstrap: async () => {
         try {
           const last = await configGetLastVault();
           if (last) {
-            set({ vaultPath: last });
+            set({ vaultPath: last, pendingReconnect: null });
             await get().refresh();
+            return;
           }
+          // No active vault — but in web we may have a stored handle that
+          // simply needs a permission re-grant on user gesture.
+          const pending = await pendingReconnectName();
+          if (pending) set({ pendingReconnect: pending });
         } catch (e) {
           set({ error: String(e) });
         }
@@ -92,9 +104,29 @@ export function createVaultStore() {
           noteContent: "",
           saveState: "idle",
           error: null,
+          pendingReconnect: null,
         });
         try {
           await configSetLastVault(picked);
+          await get().refresh();
+        } catch (e) {
+          set({ error: String(e) });
+        }
+      },
+
+      reconnect: async () => {
+        try {
+          const name = await reconnectStoredVault();
+          if (!name) return;
+          await get().flushPendingSave();
+          set({
+            vaultPath: name,
+            activeNotePath: null,
+            noteContent: "",
+            saveState: "idle",
+            error: null,
+            pendingReconnect: null,
+          });
           await get().refresh();
         } catch (e) {
           set({ error: String(e) });
