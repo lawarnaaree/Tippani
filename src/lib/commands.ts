@@ -71,6 +71,7 @@ export type UseCommandsOpts = {
   onOpenSettings: () => void;
   onExportHtml: () => void;
   onExportPdf: () => void;
+  onNewNoteFromTemplate?: () => void;
 };
 
 /**
@@ -92,6 +93,7 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
     onOpenSettings,
     onExportHtml,
     onExportPdf,
+    onNewNoteFromTemplate,
   } = opts;
 
   return useMemo(() => {
@@ -117,6 +119,17 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
         section: "actions" as const,
         run: onNewNote,
       },
+      ...(onNewNoteFromTemplate
+        ? [
+            {
+              id: "action:new-from-template",
+              label: "New note from template",
+              keywords: ["create", "template", "lab", "report", "lecture", "problem", "cs"],
+              section: "actions" as const,
+              run: onNewNoteFromTemplate,
+            },
+          ]
+        : []),
       {
         id: "action:change-vault",
         label: "Change vault",
@@ -217,5 +230,6 @@ export function useCommands(opts: UseCommandsOpts): Command[] {
     onOpenSettings,
     onExportHtml,
     onExportPdf,
+    onNewNoteFromTemplate,
   ]);
 }

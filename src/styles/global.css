@@ -1121,3 +1121,243 @@ button {
   background: transparent;
   cursor: pointer;
 }
+
+/* ─────────────────────────── KaTeX Math ─────────────────────────── */
+
+.tippani-preview-md .katex-display-wrap {
+  overflow-x: auto;
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+.tippani-preview-md .katex {
+  font-size: 1.05em;
+}
+
+.dark .tippani-preview-md .katex {
+  color: var(--tippani-doc-fg);
+}
+
+/* KaTeX error spans */
+.tippani-preview-md .katex-error {
+  color: #e53e3e;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+}
+
+/* ─────────────────────── Wikilinks ─────────────────────── */
+
+.tippani-wikilink {
+  color: var(--tippani-doc-link);
+  text-decoration: underline dashed;
+  text-decoration-color: var(--tippani-doc-rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: text-decoration-color 120ms ease;
+}
+
+.tippani-wikilink:hover {
+  text-decoration-style: solid;
+  text-decoration-color: var(--tippani-doc-fg);
+}
+
+/* ───────────────────────── Tags ─────────────────────────── */
+
+.tippani-tag {
+  display: inline-block;
+  background: var(--tippani-doc-code-bg);
+  color: var(--tippani-doc-link);
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 0.86em;
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+
+.tippani-tag:hover {
+  background: var(--tippani-active);
+}
+
+/* ─────────────────────── Flashcards ─────────────────────── */
+
+.tippani-flashcard {
+  border: 1px solid var(--tippani-doc-border);
+  border-radius: 10px;
+  background: var(--tippani-doc-pre-bg);
+  margin: 1.2em 0;
+  overflow: hidden;
+}
+
+.tippani-flashcard-front {
+  padding: 16px 20px;
+  font-weight: 500;
+}
+
+.tippani-flashcard-back {
+  padding: 16px 20px;
+  border-top: 1px solid var(--tippani-doc-border);
+  color: var(--tippani-doc-muted);
+}
+
+.tippani-flashcard-back.hidden {
+  display: none;
+}
+
+.tippani-flashcard-actions {
+  padding: 8px 16px 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tippani-flashcard-flip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--tippani-border);
+  background: var(--tippani-bg);
+  color: var(--tippani-fg);
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+
+.tippani-flashcard-flip:hover {
+  background: var(--tippani-hover);
+}
+
+/* ─────────────── Outline Panel ─────────────── */
+
+.tippani-outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--tippani-fg);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 60ms ease;
+}
+
+.tippani-outline-item:hover {
+  background: var(--tippani-hover);
+}
+
+.tippani-outline-h1 { padding-left: 8px; font-weight: 600; }
+.tippani-outline-h2 { padding-left: 16px; }
+.tippani-outline-h3 { padding-left: 24px; color: var(--tippani-muted); }
+.tippani-outline-h4 { padding-left: 32px; color: var(--tippani-muted); font-size: 11px; }
+.tippani-outline-h5,
+.tippani-outline-h6 { padding-left: 40px; color: var(--tippani-muted); font-size: 11px; }
+
+/* ─────────────── Review Modal ─────────────── */
+
+.tippani-review-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tippani-review-modal {
+  background: var(--tippani-bg);
+  border: 1px solid var(--tippani-border);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 540px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  padding: 28px;
+}
+
+.dark .tippani-review-modal {
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.tippani-review-progress {
+  height: 4px;
+  background: var(--tippani-border);
+  border-radius: 2px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.tippani-review-progress-fill {
+  height: 100%;
+  background: var(--tippani-accent);
+  border-radius: 2px;
+  transition: width 200ms ease;
+}
+
+.tippani-review-card-front {
+  font-size: 16px;
+  font-weight: 500;
+  min-height: 80px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.tippani-review-card-back {
+  font-size: 14px;
+  color: var(--tippani-muted);
+  padding: 14px;
+  background: var(--tippani-hover);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  min-height: 60px;
+  line-height: 1.5;
+}
+
+.tippani-review-grade-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tippani-review-grade-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 7px;
+  border: 1px solid var(--tippani-border);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 80ms ease;
+  background: var(--tippani-bg);
+  color: var(--tippani-fg);
+}
+
+.tippani-review-grade-btn:hover { background: var(--tippani-hover); }
+.tippani-review-grade-again { border-color: #ef4444; color: #ef4444; }
+.tippani-review-grade-hard { border-color: #f97316; color: #f97316; }
+.tippani-review-grade-good { border-color: #22c55e; color: #22c55e; }
+.tippani-review-grade-easy { border-color: #3b82f6; color: #3b82f6; }
+
+/* ─────────── Template Picker Modal ─────────── */
+
+.tippani-template-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 60ms ease, border-color 60ms ease;
+}
+
+.tippani-template-item:hover {
+  background: var(--tippani-hover);
+  border-color: var(--tippani-border);
+}

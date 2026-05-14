@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, Suspense, lazy } from "react";
+import { useCallback, useEffect, useState, Suspense, lazy, useMemo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   noteRead,
+  noteWrite,
   onNoteUpdated,
   onVaultChanged,
   vaultWatch,
@@ -9,11 +10,16 @@ import {
 import { useVault } from "./stores/vault";
 import { useTabs, type ViewMode } from "./stores/tabs";
 import { useSettings } from "./stores/settings";
+import { useCards } from "./stores/cards";
 import { useApplyThemeOnSystemChange } from "./hooks/useResolvedTheme";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useCommands } from "./lib/commands";
+import { flattenEntries } from "./lib/commands";
 import { FileTree } from "./components/Sidebar/FileTree";
 import { SearchPanel } from "./components/Sidebar/SearchPanel";
+import { OutlinePanel } from "./components/Sidebar/OutlinePanel";
+import { BacklinksPanel } from "./components/Sidebar/BacklinksPanel";
+import { TagsPanel } from "./components/Sidebar/TagsPanel";
 import { MarkdownEditor } from "./components/Editor/MarkdownEditor";
 import { AppShell } from "./components/Layout/AppShell";
 import { TopBar } from "./components/Layout/TopBar";
@@ -22,9 +28,12 @@ import { Palette } from "./components/CommandPalette/Palette";
 import { PreviewPane } from "./components/Editor/PreviewPane";
 import { SettingsModal } from "./components/Settings/SettingsModal";
 import { SymbolPalette } from "./components/SymbolPalette/SymbolPalette";
+import { ReviewModal } from "./components/Flashcards/ReviewModal";
+import { TemplatePicker } from "./components/Templates/TemplatePicker";
 import { exportHtml, exportPdf } from "./lib/export";
 import { noteStem } from "./lib/markdown";
 import { insertAtCursor, wrapSelection } from "./stores/activeEditor";
+import { BUILT_IN_TEMPLATES, applyTemplateTitle } from "./lib/templates";
 
 const CanvasEditor = lazy(() => import("./components/Canvas/CanvasEditor"));
 
@@ -46,6 +55,10 @@ export default function App() {
   const flushPendingSave = useVault((s) => s.flushPendingSave);
   const clearActive = useVault((s) => s.clearActive);
   const createNote = useVault((s) => s.createNote);
+  const createNoteFromTemplate = useVault((s) => s.createNoteFromTemplate);
+  const tagIndex = useVault((s) => s.tagIndex);
+  const tagFilter = useVault((s) => s.tagFilter);
+  const setTagFilter = useVault((s) => s.setTagFilter);
 
   // Tabs
   const tabs = useTabs((s) => s.tabs);
@@ -67,11 +80,16 @@ export default function App() {
   const theme = useSettings((s) => s.theme);
   const cycleTheme = useSettings((s) => s.cycleTheme);
 
+  // Flashcard review
+  const dueCount = useCards((s) => s.getDueCount());
+
   // Command palette state
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarCreating, setSidebarCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [symbolPaletteOpen, setSymbolPaletteOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string, ms = 2200) => {
@@ -217,6 +235,54 @@ export default function App() {
     exportPdf(noteStem(activePath), noteContent);
   }, [activePath, noteContent]);
 
+  const handleWikilinkClick = useCallback(
+    (noteName: string) => {
+      const allEntries = flattenEntries(entries);
+      const match = allEntries.find(
+        (e) => e.name.replace(/\.md$/i, "").toLowerCase() === noteName.toLowerCase(),
+      );
+      if (match) {
+        openTab(match.path);
+      } else {
+        showToast(`Note "${noteName}" not found in vault.`);
+      }
+    },
+    [entries, openTab, showToast],
+  );
+
+  const handleTagClick = useCallback(
+    (tag: string) => {
+      setTagFilter(tag);
+    },
+    [setTagFilter],
+  );
+
+  const handleNewNoteFromTemplate = useCallback(() => {
+    setPaletteOpen(false);
+    setTemplatePickerOpen(true);
+  }, []);
+
+  const handleTemplateSelect = useCallback(
+    async (templateContent: string | null, newName: string) => {
+      await createNoteFromTemplate(templateContent, newName);
+    },
+    [createNoteFromTemplate],
+  );
+
+  const handleCreateBuiltInTemplates = useCallback(async () => {
+    if (!vaultPath) return;
+    for (const t of BUILT_IN_TEMPLATES) {
+      const path = `${vaultPath}/_templates/${t.filename}`;
+      try {
+        await noteWrite(path, applyTemplateTitle(t.content, t.name));
+      } catch {
+        // ignore if already exists
+      }
+    }
+    await refresh();
+    showToast("Built-in templates created in _templates/");
+  }, [vaultPath, refresh, showToast]);
+
   const commands = useCommands({
     entries,
     activePath,
@@ -233,6 +299,7 @@ export default function App() {
     onOpenSettings: handleOpenSettings,
     onExportHtml: handleExportHtml,
     onExportPdf: handleExportPdf,
+    onNewNoteFromTemplate: handleNewNoteFromTemplate,
   });
 
   // Global keyboard shortcuts (⌘K, ⌘P, ⌘N, ⌘Shift+L, ⌘Shift+S)
@@ -271,11 +338,18 @@ export default function App() {
           loading={loading}
           entries={entries}
           activePath={activePath}
+          noteContent={noteContent}
+          tagIndex={tagIndex}
+          tagFilter={tagFilter}
           onSelect={(p) => openTab(p)}
           onCreateNote={createNote}
           isCreating={sidebarCreating}
           onCreatingChange={setSidebarCreating}
           onOpenHit={(p) => openTab(p)}
+          onSelectTag={(tag) => { setTagFilter(tag); }}
+          onOpenNote={(p) => openTab(p)}
+          dueCount={dueCount}
+          onStartReview={() => setReviewOpen(true)}
         />}
         tabBar={
           <TabBar
@@ -309,7 +383,7 @@ export default function App() {
                 minSize={20}
                 className="flex flex-col relative bg-[var(--tippani-bg)] min-h-0 min-w-0"
               >
-                <PreviewPane path={activePath} content={noteContent} />
+                <PreviewPane path={activePath} content={noteContent} onWikilinkClick={handleWikilinkClick} onTagClick={handleTagClick} />
               </Panel>
             </Group>
           ) : activeViewMode === "canvas" ? (
@@ -340,6 +414,20 @@ export default function App() {
         open={symbolPaletteOpen}
         onClose={() => setSymbolPaletteOpen(false)}
         onInsert={handleInsertSymbol}
+      />
+      <ReviewModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        entries={entries}
+        vaultPath={vaultPath}
+      />
+      <TemplatePicker
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        entries={entries}
+        vaultPath={vaultPath}
+        onSelect={handleTemplateSelect}
+        onCreateBuiltIns={() => { void handleCreateBuiltInTemplates(); }}
       />
       {toast && <Toast text={toast} />}
       {error && <ErrorBanner text={error} />}
@@ -414,23 +502,66 @@ function ErrorBanner({ text }: { text: string }) {
   );
 }
 
-type SidebarTab = "files" | "search";
+type SidebarTab = "files" | "search" | "outline" | "backlinks" | "tags";
 
 type SidebarContentProps = {
   vaultPath: string | null;
   loading: boolean;
   entries: import("./lib/tauri").VaultEntry[];
   activePath: string | null;
+  noteContent: string;
+  tagIndex: import("./lib/tags").TagIndex;
+  tagFilter: string | null;
   onSelect: (path: string) => void;
   onCreateNote: (path: string) => Promise<void>;
   isCreating: boolean;
   onCreatingChange: (v: boolean) => void;
   onOpenHit: (path: string, line: number) => void;
+  onSelectTag: (tag: string | null) => void;
+  onOpenNote: (path: string) => void;
+  dueCount: number;
+  onStartReview: () => void;
 };
 
-function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onCreateNote, isCreating, onCreatingChange, onOpenHit }: SidebarContentProps) {
+function SidebarContent({
+  vaultPath,
+  loading,
+  entries,
+  activePath,
+  noteContent,
+  tagIndex,
+  tagFilter,
+  onSelect,
+  onCreateNote,
+  isCreating,
+  onCreatingChange,
+  onOpenHit,
+  onSelectTag,
+  onOpenNote,
+  dueCount,
+  onStartReview,
+}: SidebarContentProps) {
   const [newFileName, setNewFileName] = useState("");
   const [tab, setTab] = useState<SidebarTab>("files");
+
+  // Compute filtered entries for tag filter
+  const displayEntries = useMemo(() => {
+    if (!tagFilter || !tagIndex[tagFilter]) return entries;
+    const taggedPaths = new Set(tagIndex[tagFilter]);
+    function filterEntries(ents: import("./lib/tauri").VaultEntry[]): import("./lib/tauri").VaultEntry[] {
+      const result: import("./lib/tauri").VaultEntry[] = [];
+      for (const e of ents) {
+        if (e.kind === "file" && taggedPaths.has(e.path)) {
+          result.push(e);
+        } else if (e.kind === "folder" && e.children) {
+          const filtered = filterEntries(e.children);
+          if (filtered.length > 0) result.push({ ...e, children: filtered });
+        }
+      }
+      return result;
+    }
+    return filterEntries(entries);
+  }, [entries, tagFilter, tagIndex]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,16 +574,26 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {vaultPath !== null && (
-        <div className="shrink-0 flex border-b border-[var(--tippani-border)] text-xs">
+        <div className="shrink-0 flex flex-wrap border-b border-[var(--tippani-border)] text-xs">
           <SidebarTabButton active={tab === "files"} onClick={() => setTab("files")}>
             Files
           </SidebarTabButton>
           <SidebarTabButton active={tab === "search"} onClick={() => setTab("search")}>
             Search
           </SidebarTabButton>
+          <SidebarTabButton active={tab === "outline"} onClick={() => setTab("outline")}>
+            Outline
+          </SidebarTabButton>
+          <SidebarTabButton active={tab === "backlinks"} onClick={() => setTab("backlinks")}>
+            Links
+          </SidebarTabButton>
+          <SidebarTabButton active={tab === "tags"} onClick={() => setTab("tags")}>
+            Tags
+          </SidebarTabButton>
         </div>
       )}
-      {tab === "files" ? (
+
+      {tab === "files" && (
         <>
           {vaultPath !== null && !loading && (
             <div className="shrink-0 border-b border-[var(--tippani-border)] px-3 py-2">
@@ -495,26 +636,65 @@ function SidebarContent({ vaultPath, loading, entries, activePath, onSelect, onC
               )}
             </div>
           )}
+          {tagFilter && (
+            <div className="shrink-0 px-3 py-1 flex items-center gap-2 text-xs border-b border-[var(--tippani-border)]">
+              <span style={{ color: "var(--tippani-muted)" }}>Filtered: #{tagFilter}</span>
+              <button
+                onClick={() => onSelectTag(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tippani-muted)", fontSize: 12 }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto py-2">
             {vaultPath === null ? (
-              <div className="px-3 py-2 text-xs text-[var(--tippani-muted)]">
-                No vault open.
-              </div>
+              <div className="px-3 py-2 text-xs text-[var(--tippani-muted)]">No vault open.</div>
             ) : loading ? (
-              <div className="px-3 py-2 text-xs text-[var(--tippani-muted)]">
-                Loading…
-              </div>
+              <div className="px-3 py-2 text-xs text-[var(--tippani-muted)]">Loading…</div>
             ) : (
-              <FileTree
-                entries={entries}
-                activePath={activePath}
-                onSelect={onSelect}
-              />
+              <FileTree entries={displayEntries} activePath={activePath} onSelect={onSelect} />
             )}
           </div>
+          {dueCount > 0 && (
+            <div className="shrink-0 border-t border-[var(--tippani-border)] px-3 py-2">
+              <button
+                onClick={onStartReview}
+                className="flex w-full items-center justify-center gap-1.5 rounded border border-[var(--tippani-border)] px-3 py-1.5 text-xs hover:bg-[var(--tippani-hover)]"
+              >
+                <span>📚</span>
+                <span>Review ({dueCount} due)</span>
+              </button>
+            </div>
+          )}
         </>
-      ) : (
+      )}
+
+      {tab === "search" && (
         <SearchPanel vaultPath={vaultPath} onOpenHit={onOpenHit} />
+      )}
+
+      {tab === "outline" && (
+        <OutlinePanel content={noteContent} />
+      )}
+
+      {tab === "backlinks" && (
+        <BacklinksPanel
+          activePath={activePath}
+          entries={entries}
+          onOpenNote={onOpenNote}
+        />
+      )}
+
+      {tab === "tags" && (
+        <TagsPanel
+          tagIndex={tagIndex}
+          activeFilter={tagFilter}
+          onSelectTag={(tag) => {
+            onSelectTag(tag);
+            setTab("files");
+          }}
+        />
       )}
     </div>
   );
@@ -533,7 +713,7 @@ function SidebarTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 px-3 py-2 ${active ? "bg-[var(--tippani-hover)] font-medium" : "text-[var(--tippani-muted)] hover:bg-[var(--tippani-hover)]"}`}
+      className={`flex-1 px-2 py-2 ${active ? "bg-[var(--tippani-hover)] font-medium" : "text-[var(--tippani-muted)] hover:bg-[var(--tippani-hover)]"}`}
     >
       {children}
     </button>

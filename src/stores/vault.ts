@@ -11,6 +11,8 @@ import {
   pendingReconnectName,
   reconnectStoredVault,
 } from "../lib/tauri";
+import { buildTagIndex, type TagIndex } from "../lib/tags";
+import { applyTemplateTitle } from "../lib/templates";
 
 export const SAVE_DEBOUNCE_MS = 400;
 
@@ -28,6 +30,11 @@ export type VaultStoreState = {
   // permission re-grant before it can be used again. Always null on desktop.
   pendingReconnect: string | null;
 
+  // Tags
+  tagIndex: TagIndex;
+  tagFilter: string | null;
+  setTagFilter: (tag: string | null) => void;
+
   bootstrap: () => Promise<void>;
   pickAndOpen: () => Promise<void>;
   reconnect: () => Promise<void>;
@@ -38,6 +45,7 @@ export type VaultStoreState = {
   flushPendingSave: () => Promise<void>;
   clearActive: () => Promise<void>;
   createNote: (path: string) => Promise<void>;
+  createNoteFromTemplate: (templateContent: string | null, newPath: string) => Promise<void>;
 };
 
 export function createVaultStore() {
@@ -76,6 +84,10 @@ export function createVaultStore() {
       saveState: "idle",
       error: null,
       pendingReconnect: null,
+      tagIndex: {},
+      tagFilter: null,
+
+      setTagFilter: (tag) => set({ tagFilter: tag }),
 
       bootstrap: async () => {
         try {
@@ -140,6 +152,10 @@ export function createVaultStore() {
         try {
           const entries = await vaultList(path);
           set({ entries, loading: false });
+          // Build tag index in background after entries are set
+          buildTagIndex(entries)
+            .then((tagIndex) => set({ tagIndex }))
+            .catch(() => {/* silent */});
         } catch (e) {
           set({ error: String(e), loading: false });
         }
@@ -224,6 +240,26 @@ export function createVaultStore() {
         try {
           await noteCreate(fullPath);
           await get().refresh();
+        } catch (e) {
+          set({ error: String(e) });
+        }
+      },
+
+      createNoteFromTemplate: async (templateContent, newPath) => {
+        const vaultPath = get().vaultPath;
+        if (!vaultPath) return;
+        let fullPath = newPath.endsWith(".md") ? newPath : newPath + ".md";
+        if (!fullPath.startsWith(vaultPath)) {
+          fullPath = vaultPath + "/" + fullPath;
+        }
+        const noteName = fullPath.split(/[/\\]/).pop()!.replace(/\.md$/i, "");
+        const content = templateContent
+          ? applyTemplateTitle(templateContent, noteName)
+          : `# ${noteName}\n\n`;
+        try {
+          await noteWrite(fullPath, content);
+          await get().refresh();
+          await get().openNote(fullPath);
         } catch (e) {
           set({ error: String(e) });
         }

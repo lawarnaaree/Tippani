@@ -44,12 +44,15 @@ function escapeHtml(s: string): string {
   });
 }
 
+const KATEX_LINK = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">`;
+
 function makeShell(title: string, bodyHtml: string): string {
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
+${KATEX_LINK}
 <style>${BASE_CSS}${PRINT_CSS}</style>
 </head>
 <body>
