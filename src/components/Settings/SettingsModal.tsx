@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   useSettings,
 } from "../../stores/settings";
 import { check } from "@tauri-apps/plugin-updater";
-import { useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 
 const FONT_FAMILY_OPTIONS: { label: string; value: string }[] = [
   {
@@ -47,22 +47,26 @@ export function SettingsModal({ open, onClose, vaultPath, onChangeVault }: Props
   const update = useSettings((s) => s.update);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     setUpdateStatus(null);
     try {
-      const update = await check();
-      if (update) {
-        setUpdateStatus(`Update available: v${update.version}`);
-        // For simplicity in this UI, we just notify. 
-        // In a real app, you'd show a "Download & Install" button.
+      const available = await check();
+      if (available) {
+        setUpdateStatus(`Update available: v${available.version}`);
       } else {
-        setUpdateStatus("No updates available.");
+        setUpdateStatus("You're on the latest version.");
       }
     } catch (e) {
       console.error(e);
-      setUpdateStatus("Error checking for updates.");
+      const msg = e instanceof Error ? e.message : String(e);
+      setUpdateStatus(`Error checking for updates: ${msg}`);
     } finally {
       setCheckingUpdate(false);
     }
@@ -190,7 +194,7 @@ export function SettingsModal({ open, onClose, vaultPath, onChangeVault }: Props
         <Section title="App">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--tippani-muted)]">Version 0.1.0</span>
+              <span className="text-xs text-[var(--tippani-muted)]">Version {appVersion ?? "…"}</span>
               <button
                 type="button"
                 onClick={handleCheckForUpdates}
