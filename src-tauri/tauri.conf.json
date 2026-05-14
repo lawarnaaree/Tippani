@@ -1,7 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Tippani",
+<<<<<<< HEAD
   "version": "0.1.3",
+=======
+  "version": "0.1.2",
+>>>>>>> staging
   "identifier": "com.tippani.app",
   "build": {
     "beforeDevCommand": "npm run dev",

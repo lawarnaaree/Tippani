@@ -49,7 +49,7 @@ export function TopBar({
   return (
     <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--tippani-border)] px-3 text-sm">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="font-semibold tracking-tight">Tippani</span>
+        <span className="tracking-tight">Path</span>
         {vaultPath && (
           <span
             className="truncate text-xs text-[var(--tippani-muted)]"
