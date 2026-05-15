@@ -37,6 +37,8 @@ export default function CanvasEditor({ path, onOpenMenu, onOpenSymbols }: Props)
   const canvasPath = path.replace(/\.md$/i, ".canvas.json");
 
   useEffect(() => {
+    setLoading(true);
+    setInitialData(null);
     let active = true;
     noteRead(canvasPath)
       .then((content) => {

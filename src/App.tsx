@@ -389,6 +389,7 @@ export default function App() {
           ) : activeViewMode === "canvas" ? (
             <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-[var(--tippani-muted)]">Loading Excalidraw...</div>}>
               <CanvasEditor
+                key={activePath}
                 path={activePath}
                 onOpenMenu={() => setPaletteOpen(true)}
                 onOpenSymbols={() => setSymbolPaletteOpen(true)}
